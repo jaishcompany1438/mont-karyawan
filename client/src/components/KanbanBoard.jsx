@@ -130,7 +130,7 @@ export default function KanbanBoard({
                       <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-600 mb-2">
                         <div className="flex items-center space-x-1 font-medium truncate">
                           <User className="w-3 h-3 text-slate-400 shrink-0" />
-                          <span className="truncate">{task.assignee_nama}</span>
+                          <span className="truncate">{task.assignee_nama}{task.assignee_sub_bidang ? ` · ${task.assignee_sub_bidang}` : ''}</span>
                         </div>
                         <span className="text-[10px] px-1.5 py-0.5 bg-slate-100 text-slate-600 rounded font-medium truncate max-w-[90px]">
                           {task.kode_bidang}

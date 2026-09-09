@@ -53,7 +53,7 @@ export default function MobileTaskGroups({ tasks = [], onOpenSubmitWork, onOpenR
                     </div>
                     <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-slate-500">
                       <span className="flex items-center gap-1"><Calendar className="h-3 w-3" />{new Date(task.due_date).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
-                      <span>{task.assignee_nama}</span>
+                      <span>{task.assignee_nama}{task.assignee_sub_bidang ? ` · ${task.assignee_sub_bidang}` : ''}</span>
                     </div>
                     <div className="mt-2 flex items-center justify-between gap-2">
                       <span className={`text-[10px] font-bold ${group.id === 'overdue' ? 'text-rose-600' : group.id === 'completed' ? 'text-emerald-600' : 'text-blue-600'}`}>{statusLabel(task.status)}</span>

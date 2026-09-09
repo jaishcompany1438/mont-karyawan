@@ -6,7 +6,7 @@ const dotenv = require('dotenv');
 
 dotenv.config();
 
-const { initDB, isDbConnected } = require('./config/db');
+const { initDB, isDbConnected, generateDueRecurringTasks } = require('./config/db');
 const seedData = require('./config/seed');
 
 const authRoutes = require('./routes/authRoutes');
@@ -74,6 +74,18 @@ async function startServer() {
   await initDB();
   if (isDbConnected()) {
     await seedData();
+    // Keep recurring task generation server-side; no frontend request is
+    // required for the next HARIAN/PEKANAN/BULANAN instance to be created.
+    const runRecurringTaskGeneration = async () => {
+      try {
+        const generated = await generateDueRecurringTasks();
+        if (generated > 0) console.log(`[Scheduler] Generated ${generated} recurring task instance(s).`);
+      } catch (error) {
+        console.error('[Scheduler] Failed to generate recurring tasks:', error.message);
+      }
+    };
+    await runRecurringTaskGeneration();
+    setInterval(runRecurringTaskGeneration, 60 * 1000).unref();
   }
 
   app.listen(PORT, () => {

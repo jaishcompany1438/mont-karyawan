@@ -16,6 +16,7 @@ import Reports from './pages/Reports';
 function AuthenticatedApp() {
   const { isAuthenticated, loading } = useAuth();
   const [activeTab, setActiveTab] = useState('dashboard');
+  const [taskFilters, setTaskFilters] = useState({});
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [taskModalOpen, setTaskModalOpen] = useState(false);
   const [uploadModalOpen, setUploadModalOpen] = useState(false);
@@ -36,10 +37,11 @@ function AuthenticatedApp() {
 
   const pageProps = { refreshKey, onRefresh: refresh };
   const page = {
-    dashboard: <Dashboard {...pageProps} onNavigate={setActiveTab} />,
+    dashboard: <Dashboard {...pageProps} onNavigate={(tab, filters = {}) => { setTaskFilters(filters); setActiveTab(tab); }} />,
     tasks: (
       <Tasks
         {...pageProps}
+        initialFilters={taskFilters}
         onOpenCreateTask={() => setTaskModalOpen(true)}
         onOpenSubmitWork={setSubmitTask}
       />
@@ -47,7 +49,7 @@ function AuthenticatedApp() {
     departments: <Departments {...pageProps} />,
     users: <Users {...pageProps} />,
     reports: <Reports {...pageProps} />,
-  }[activeTab] || <Dashboard {...pageProps} onNavigate={setActiveTab} />;
+  }[activeTab] || <Dashboard {...pageProps} onNavigate={(tab, filters = {}) => { setTaskFilters(filters); setActiveTab(tab); }} />;
 
   return (
     <div className="min-h-screen bg-slate-50">

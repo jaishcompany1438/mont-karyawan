@@ -9,7 +9,8 @@ const initialForm = {
   password: '',
   role: 'STAF',
   bidang_id: '',
-  jabatan: ''
+  jabatan: '',
+  sub_bidang: ''
 };
 
 export default function Users({ refreshKey, onRefresh }) {
@@ -131,6 +132,10 @@ export default function Users({ refreshKey, onRefresh }) {
               Jabatan
               <input value={form.jabatan} onChange={(e) => updateField('jabatan', e.target.value)} className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 text-sm font-normal outline-none focus:ring-2 focus:ring-emerald-500" />
             </label>
+            <label className="text-xs font-bold text-slate-700">
+              Sub-Bidang / Unit
+              <input placeholder="Contoh: Masjid, Asrama, Publikasi" value={form.sub_bidang} onChange={(e) => updateField('sub_bidang', e.target.value)} className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 text-sm font-normal outline-none focus:ring-2 focus:ring-emerald-500" />
+            </label>
           </div>
           <div className="mt-4 flex justify-end gap-2">
             <button type="button" onClick={() => setShowForm(false)} className="rounded-xl px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100">Batal</button>
@@ -142,10 +147,10 @@ export default function Users({ refreshKey, onRefresh }) {
       <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-sm">
         <table className="w-full text-left text-xs">
           <thead className="bg-slate-50 font-bold text-slate-600">
-            <tr><th className="p-3">Nama</th><th className="p-3">Email</th><th className="p-3">Role</th><th className="p-3">Bidang</th><th className="p-3">Jabatan</th></tr>
+            <tr><th className="p-3">Nama</th><th className="p-3">Email</th><th className="p-3">Role</th><th className="p-3">Bidang / Unit</th><th className="p-3">Jabatan</th></tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
-            {users.map((item) => <tr key={item.id}><td className="p-3 font-semibold text-slate-800">{item.nama}</td><td className="p-3">{item.email}</td><td className="p-3">{item.role}</td><td className="p-3">{item.nama_bidang || '-'}</td><td className="p-3">{item.jabatan || '-'}</td></tr>)}
+            {users.map((item) => <tr key={item.id}><td className="p-3 font-semibold text-slate-800">{item.nama}</td><td className="p-3">{item.email}</td><td className="p-3">{item.role}</td><td className="p-3">{item.nama_bidang || '-'}{item.sub_bidang && <span className="block text-[10px] text-emerald-700">{item.sub_bidang}</span>}</td><td className="p-3">{item.jabatan || '-'}</td></tr>)}
             {!users.length && <tr><td colSpan="5" className="p-8 text-center text-slate-400">Belum ada data pengguna.</td></tr>}
           </tbody>
         </table>

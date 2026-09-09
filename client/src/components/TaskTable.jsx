@@ -130,7 +130,7 @@ export default function TaskTable({
                     {/* Assignee & Bidang */}
                     <td className="py-3.5 px-3 whitespace-nowrap">
                       <div className="font-semibold text-slate-800">{task.assignee_nama}</div>
-                      <div className="text-[10px] text-slate-500">{task.nama_bidang}</div>
+                      <div className="text-[10px] text-slate-500">{task.nama_bidang}{task.assignee_sub_bidang ? ` · ${task.assignee_sub_bidang}` : ''}</div>
                     </td>
 
                     {/* Due Date */}

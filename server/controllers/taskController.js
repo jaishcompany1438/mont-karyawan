@@ -1,5 +1,10 @@
 const { getPool, isDbConnected } = require('../config/db');
 
+function recurringFlag(value, defaultValue) {
+  if (value === undefined || value === null || value === '') return defaultValue;
+  return ['1', 'true', 'ya', 'y', 'yes'].includes(String(value).toLowerCase()) ? 1 : 0;
+}
+
 // GET /api/tasks
 async function getTasks(req, res) {
   try {
@@ -15,6 +20,7 @@ async function getTasks(req, res) {
       SELECT t.*,
              creator.nama AS creator_nama, creator.role AS creator_role,
              assignee.nama AS assignee_nama, assignee.email AS assignee_email, assignee.jabatan AS assignee_jabatan,
+             assignee.sub_bidang AS assignee_sub_bidang,
              b.nama_bidang, b.kode_bidang
       FROM tasks t
       JOIN users creator ON t.created_by = creator.id
@@ -97,6 +103,7 @@ async function getTaskById(req, res) {
       `SELECT t.*,
               creator.nama AS creator_nama, creator.role AS creator_role,
               assignee.nama AS assignee_nama, assignee.email AS assignee_email, assignee.jabatan AS assignee_jabatan,
+              assignee.sub_bidang AS assignee_sub_bidang,
               b.nama_bidang, b.kode_bidang
        FROM tasks t
        JOIN users creator ON t.created_by = creator.id
@@ -144,7 +151,8 @@ async function createTask(req, res) {
       prioritas = 'SEDANG',
       assigned_to,
       bidang_id,
-      due_date
+      due_date,
+      is_recurring
     } = req.body;
 
     if (!judul || !assigned_to || !due_date) {
@@ -194,8 +202,8 @@ async function createTask(req, res) {
     const [result] = await db.query(
       `INSERT INTO tasks (
         judul, deskripsi, periode, kategori, prioritas, status,
-        created_by, assigned_to, bidang_id, due_date, file_attachment
-      ) VALUES (?, ?, ?, ?, ?, 'TO_DO', ?, ?, ?, ?, ?)`,
+        created_by, assigned_to, bidang_id, due_date, file_attachment, is_recurring
+      ) VALUES (?, ?, ?, ?, ?, 'TO_DO', ?, ?, ?, ?, ?, ?)`,
       [
         judul.trim(),
         deskripsi || null,
@@ -206,7 +214,11 @@ async function createTask(req, res) {
         assignee.id,
         targetBidangId,
         new Date(due_date),
-        file_attachment
+        file_attachment,
+        recurringFlag(
+          is_recurring,
+          ['HARIAN', 'PEKANAN', 'BULANAN'].includes(String(periode).toUpperCase()) ? 1 : 0
+        )
       ]
     );
 
@@ -253,7 +265,8 @@ async function updateTask(req, res) {
       status,
       assigned_to,
       bidang_id,
-      due_date
+      due_date,
+      is_recurring
     } = req.body;
 
     const file_attachment = req.file ? `/uploads/${req.file.filename}` : (req.body.file_attachment !== undefined ? req.body.file_attachment : task.file_attachment);
@@ -261,7 +274,8 @@ async function updateTask(req, res) {
     await db.query(
       `UPDATE tasks SET
         judul = ?, deskripsi = ?, periode = ?, kategori = ?, prioritas = ?,
-        status = ?, assigned_to = ?, bidang_id = ?, due_date = ?, file_attachment = ?
+        status = ?, assigned_to = ?, bidang_id = ?, due_date = ?, file_attachment = ?,
+        is_recurring = ?, recurrence_generated_at = NULL
        WHERE id = ?`,
       [
         judul || task.judul,
@@ -274,6 +288,7 @@ async function updateTask(req, res) {
         bidang_id || task.bidang_id,
         due_date ? new Date(due_date) : task.due_date,
         file_attachment,
+        recurringFlag(is_recurring, task.is_recurring),
         id
       ]
     );

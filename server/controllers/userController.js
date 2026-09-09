@@ -11,7 +11,7 @@ async function getAllUsers(req, res) {
     const db = getPool();
 
     let query = `
-      SELECT u.id, u.nama, u.email, u.role, u.bidang_id, u.jabatan, u.created_at,
+      SELECT u.id, u.nama, u.email, u.role, u.bidang_id, u.jabatan, u.sub_bidang, u.created_at,
              b.nama_bidang, b.kode_bidang
       FROM users u
       LEFT JOIN bidang b ON u.bidang_id = b.id
@@ -28,8 +28,8 @@ async function getAllUsers(req, res) {
       params.push(bidang_id);
     }
     if (search) {
-      query += ' AND (u.nama LIKE ? OR u.email LIKE ? OR u.jabatan LIKE ?)';
-      params.push(`%${search}%`, `%${search}%`, `%${search}%`);
+      query += ' AND (u.nama LIKE ? OR u.email LIKE ? OR u.jabatan LIKE ? OR u.sub_bidang LIKE ?)';
+      params.push(`%${search}%`, `%${search}%`, `%${search}%`, `%${search}%`);
     }
 
     query += ' ORDER BY u.nama ASC';
@@ -52,7 +52,7 @@ async function getAssignees(req, res) {
     const db = getPool();
 
     let query = `
-      SELECT u.id, u.nama, u.email, u.role, u.bidang_id, u.jabatan,
+      SELECT u.id, u.nama, u.email, u.role, u.bidang_id, u.jabatan, u.sub_bidang,
              b.nama_bidang, b.kode_bidang
       FROM users u
       LEFT JOIN bidang b ON u.bidang_id = b.id
@@ -87,7 +87,7 @@ async function getAssignees(req, res) {
 
 async function createUser(req, res) {
   try {
-    const { nama, email, password, role, bidang_id, jabatan } = req.body;
+    const { nama, email, password, role, bidang_id, jabatan, sub_bidang } = req.body;
     if (!nama || !email || !password || !role) {
       return res.status(400).json({ success: false, message: 'Nama, email, password, dan role wajib diisi.' });
     }
@@ -107,15 +107,15 @@ async function createUser(req, res) {
     const hashedPassword = await bcrypt.hash(password, salt);
 
     const [result] = await db.query(
-      `INSERT INTO users (nama, email, password, role, bidang_id, jabatan)
-       VALUES (?, ?, ?, ?, ?, ?)`,
-      [nama.trim(), email.trim().toLowerCase(), hashedPassword, role, bidang_id || null, jabatan || null]
+      `INSERT INTO users (nama, email, password, role, bidang_id, jabatan, sub_bidang)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      [nama.trim(), email.trim().toLowerCase(), hashedPassword, role, bidang_id || null, jabatan || null, sub_bidang || null]
     );
 
     return res.status(201).json({
       success: true,
       message: 'Pengguna berhasil ditambahkan.',
-      data: { id: result.insertId, nama, email, role, bidang_id, jabatan }
+      data: { id: result.insertId, nama, email, role, bidang_id, jabatan, sub_bidang }
     });
   } catch (error) {
     return res.status(500).json({ success: false, message: 'Gagal menambahkan pengguna: ' + error.message });
@@ -125,7 +125,7 @@ async function createUser(req, res) {
 async function updateUser(req, res) {
   try {
     const { id } = req.params;
-    const { nama, email, password, role, bidang_id, jabatan } = req.body;
+    const { nama, email, password, role, bidang_id, jabatan, sub_bidang } = req.body;
 
     if (!nama || !email || !role) {
       return res.status(400).json({ success: false, message: 'Nama, email, dan role wajib diisi.' });
@@ -144,13 +144,13 @@ async function updateUser(req, res) {
       const salt = await bcrypt.genSalt(10);
       const hashedPassword = await bcrypt.hash(password, salt);
       await db.query(
-        `UPDATE users SET nama = ?, email = ?, password = ?, role = ?, bidang_id = ?, jabatan = ? WHERE id = ?`,
-        [nama.trim(), email.trim().toLowerCase(), hashedPassword, role, bidang_id || null, jabatan || null, id]
+        `UPDATE users SET nama = ?, email = ?, password = ?, role = ?, bidang_id = ?, jabatan = ?, sub_bidang = ? WHERE id = ?`,
+        [nama.trim(), email.trim().toLowerCase(), hashedPassword, role, bidang_id || null, jabatan || null, sub_bidang || null, id]
       );
     } else {
       await db.query(
-        `UPDATE users SET nama = ?, email = ?, role = ?, bidang_id = ?, jabatan = ? WHERE id = ?`,
-        [nama.trim(), email.trim().toLowerCase(), role, bidang_id || null, jabatan || null, id]
+        `UPDATE users SET nama = ?, email = ?, role = ?, bidang_id = ?, jabatan = ?, sub_bidang = ? WHERE id = ?`,
+        [nama.trim(), email.trim().toLowerCase(), role, bidang_id || null, jabatan || null, sub_bidang || null, id]
       );
     }
 
