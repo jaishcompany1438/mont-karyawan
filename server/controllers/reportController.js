@@ -117,11 +117,9 @@ async function getDashboardStats(req, res) {
   }
 }
 
-// GET /api/reports/export/excel
-async function exportExcelReport(req, res) {
-  try {
+async function getReportRows(req) {
     const { role, bidang_id, id: userId } = req.user;
-    const { periode, status, bidang_id: filterBidangId } = req.query;
+    const { periode, status, bidang_id: filterBidangId, start_date: startDate, end_date: endDate } = req.query;
     const db = getPool();
 
     let query = `
@@ -164,11 +162,25 @@ async function exportExcelReport(req, res) {
       query += ' AND t.bidang_id = ?';
       params.push(filterBidangId);
     }
+    if (startDate) {
+      query += ' AND t.due_date >= ?';
+      params.push(`${startDate} 00:00:00`);
+    }
+    if (endDate) {
+      query += ' AND t.due_date <= ?';
+      params.push(`${endDate} 23:59:59`);
+    }
 
     query += ' ORDER BY t.periode ASC, t.due_date ASC';
 
     const [rows] = await db.query(query, params);
+    return rows;
+}
 
+// GET /api/reports/export/excel
+async function exportExcelReport(req, res) {
+  try {
+    const rows = await getReportRows(req);
     const workbook = new ExcelJS.Workbook();
     workbook.creator = 'PTQ Imam Ath Thobari Monitoring System';
     const worksheet = workbook.addWorksheet('Rekap Kinerja Tugas');
@@ -225,7 +237,74 @@ async function exportExcelReport(req, res) {
   }
 }
 
+function pdfEscape(value) {
+  return String(value || '-').replace(/\\/g, '\\\\').replace(/\(/g, '\\(').replace(/\)/g, '\\)');
+}
+
+function createReportPdf(rows, filters) {
+  const pageWidth = 842;
+  const pageHeight = 595;
+  const margin = 32;
+  const lines = [
+    'LAPORAN REKAP KINERJA TUGAS',
+    'PTQ Imam Ath Thobari',
+    `Periode: ${filters.start_date || '-'} s/d ${filters.end_date || '-'}`,
+    `Total tugas: ${rows.length}`,
+    ''
+  ];
+  rows.forEach((row, index) => {
+    lines.push(`${index + 1}. ${row.judul} | ${row.status} | ${row.periode}`);
+    lines.push(`   Penerima: ${row.assignee_nama} | Bidang: ${row.nama_bidang}`);
+    lines.push(`   Tenggat: ${new Date(row.due_date).toLocaleString('id-ID')} | Prioritas: ${row.prioritas}`);
+    lines.push('');
+  });
+
+  const content = [];
+  let y = pageHeight - margin;
+  lines.forEach((line, index) => {
+    if (y < margin) return;
+    const fontSize = index < 2 ? 16 : 9;
+    const font = index < 2 ? '/F2' : '/F1';
+    content.push(`BT ${font} ${fontSize} Tf ${margin} ${y} Td (${pdfEscape(line.slice(0, 125))}) Tj ET`);
+    y -= index < 2 ? 22 : 13;
+  });
+
+  const objects = [
+    '<< /Type /Catalog /Pages 2 0 R >>',
+    '<< /Type /Pages /Kids [3 0 R] /Count 1 >>',
+    `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${pageWidth} ${pageHeight}] /Resources << /Font << /F1 4 0 R /F2 5 0 R >> >> /Contents 6 0 R >>`,
+    '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>',
+    '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>',
+    `<< /Length ${content.join('\n').length} >>\nstream\n${content.join('\n')}\nendstream`
+  ];
+  let pdf = '%PDF-1.4\n';
+  const offsets = [0];
+  objects.forEach((object, index) => {
+    offsets[index + 1] = Buffer.byteLength(pdf, 'utf8');
+    pdf += `${index + 1} 0 obj\n${object}\nendobj\n`;
+  });
+  const xref = Buffer.byteLength(pdf, 'utf8');
+  pdf += `xref\n0 ${objects.length + 1}\n0000000000 65535 f \n`;
+  offsets.slice(1).forEach((offset) => { pdf += `${String(offset).padStart(10, '0')} 00000 n \n`; });
+  pdf += `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF`;
+  return Buffer.from(pdf, 'utf8');
+}
+
+async function exportPdfReport(req, res) {
+  try {
+    const rows = await getReportRows(req);
+    const pdf = createReportPdf(rows, req.query);
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="rekap_kinerja_${Date.now()}.pdf"`);
+    return res.send(pdf);
+  } catch (error) {
+    console.error('Export PDF report error:', error);
+    return res.status(500).json({ success: false, message: 'Gagal mengekspor PDF: ' + error.message });
+  }
+}
+
 module.exports = {
   getDashboardStats,
-  exportExcelReport
+  exportExcelReport,
+  exportPdfReport
 };

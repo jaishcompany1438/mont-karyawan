@@ -43,7 +43,11 @@ export default function Navbar({ onMenuToggle }) {
           </button>
           <div className="flex items-center space-x-2.5">
             <div className="w-10 h-10 rounded-xl bg-emerald-700 flex items-center justify-center text-white font-bold shadow-md shadow-emerald-700/20">
-              PTQ
+              <img
+                src="/logo.svg"
+                alt="Logo PTQ Imam Ath Thobari"
+                className="h-full w-full object-contain"
+              />
             </div>
             <div>
               <h1 className="text-base font-bold text-slate-900 leading-tight">

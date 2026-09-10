@@ -217,10 +217,27 @@ export const api = {
     return `${BASE_URL}/reports/export/excel?${query.toString()}`;
   },
 
+  getExportPdfUrl(params = {}) {
+    const query = new URLSearchParams();
+    Object.entries(params).forEach(([k, v]) => {
+      if (v) query.append(k, v);
+    });
+    return `${BASE_URL}/reports/export/pdf?${query.toString()}`;
+  },
+
   async downloadExportExcel(params = {}) {
     const res = await fetch(this.getExportExcelUrl(params), {
       headers: getHeaders()
     });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(data.message || `Export gagal dengan status ${res.status}`);
+    }
+    return res.blob();
+  },
+
+  async downloadExportPdf(params = {}) {
+    const res = await fetch(this.getExportPdfUrl(params), { headers: getHeaders() });
     if (!res.ok) {
       const data = await res.json().catch(() => ({}));
       throw new Error(data.message || `Export gagal dengan status ${res.status}`);
