@@ -207,20 +207,19 @@ async function importTasks(req, res) {
           errors.push(`Baris ${item.rowNumber}: Email penerima "${item.emailAssignee}" tidak ditemukan.`);
           continue;
         }
-        if ((role === 'WADIR_PEND' || role === 'WADIR_PENGS') &&
-            (!['KABID', 'STAF'].includes(assignee.role) || assignee.parent_role !== role)) {
-          errors.push(`Baris ${item.rowNumber}: Wadir hanya dapat menugaskan ke Kabid atau Staf.`);
-          continue;
-        }
-
         const assignee = users[0];
 
         // RBAC validation
         if (role === 'KABID' && (assignee.role !== 'STAF' || assignee.bidang_id !== creatorBidangId)) {
           errors.push(`Baris ${item.rowNumber}: Kabid hanya dapat menugaskan kepada staf di bidangnya sendiri.`);
           continue;
-        } else if (role === 'WAKIL_MUDIR' && !['KABID', 'STAF'].includes(assignee.role)) {
-          errors.push(`Baris ${item.rowNumber}: Wakil Mudir hanya dapat menugaskan ke Kabid atau Staf.`);
+        } else if (role === 'WADIR_PEND' || role === 'WADIR_PENGS') {
+          if (assignee.role !== 'KABID' || assignee.parent_role !== role) {
+            errors.push(`Baris ${item.rowNumber}: Wadir hanya dapat menugaskan kepada Kabid di bawah cabangnya.`);
+            continue;
+          }
+        } else if (role === 'WAKIL_MUDIR') {
+          errors.push(`Baris ${item.rowNumber}: Role Wakil Mudir lama tidak memiliki cabang. Gunakan WADIR_PEND atau WADIR_PENGS.`);
           continue;
         }
 
@@ -250,6 +249,10 @@ async function importTasks(req, res) {
         }
 
         const targetBidangId = assignee.bidang_id || creatorBidangId || 1;
+        if ((role === 'WADIR_PEND' || role === 'WADIR_PENGS') && assignee.parent_role !== role) {
+          errors.push(`Baris ${item.rowNumber}: Bidang tugas harus berada di cabang Wadir.`);
+          continue;
+        }
         const isRecurring = item.recurringRaw
           ? ['YA', 'Y', 'YES', '1', 'TRUE'].includes(item.recurringRaw) ? 1 : 0
           : ['HARIAN', 'PEKANAN', 'BULANAN'].includes(periode) ? 1 : 0;

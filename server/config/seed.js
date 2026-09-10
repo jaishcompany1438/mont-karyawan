@@ -47,7 +47,6 @@ async function seedData() {
     const salt = await bcrypt.genSalt(10);
     const defaultPassword = await bcrypt.hash('admin123', salt);
     const mudirPassword = await bcrypt.hash('mudir123', salt);
-    const wakilPassword = await bcrypt.hash('wakil123', salt);
     const wadirPendPassword = await bcrypt.hash('wadirpend123', salt);
     const wadirPengsPassword = await bcrypt.hash('wadirpengs123', salt);
     const kabidPassword = await bcrypt.hash('kabid123', salt);
@@ -62,11 +61,6 @@ async function seedData() {
     const [mudirUser] = await db.query(
       'INSERT INTO users (nama, email, password, role, bidang_id, jabatan) VALUES (?, ?, ?, ?, ?, ?)',
       ['Ustadz Pimpinan Mudir', 'mudir@thobari.sch.id', mudirPassword, 'MUDIR', null, 'Mudir Pesantren']
-    );
-
-    const [wakilUser] = await db.query(
-      'INSERT INTO users (nama, email, password, role, bidang_id, jabatan) VALUES (?, ?, ?, ?, ?, ?)',
-      ['Ustadz Wakil Mudir', 'wakil.mudir@thobari.sch.id', wakilPassword, 'WAKIL_MUDIR', null, 'Wakil Mudir Operasional']
     );
 
     await db.query(

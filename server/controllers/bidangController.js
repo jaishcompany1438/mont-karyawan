@@ -7,7 +7,11 @@ async function getAllBidang(req, res) {
     }
 
     const db = getPool();
-    const branchRole = ['WADIR_PEND', 'WADIR_PENGS'].includes(req.user.role) ? req.user.role : null;
+    const branchRole = ['WADIR_PEND', 'WADIR_PENGS'].includes(req.user.role)
+      ? req.user.role
+      : (req.user.role === 'WAKIL_MUDIR' && ['WADIR_PEND', 'WADIR_PENGS'].includes(req.user.parent_role)
+        ? req.user.parent_role
+        : null);
     const [rows] = await db.query(`
       SELECT b.*,
              (SELECT COUNT(*) FROM users u WHERE u.bidang_id = b.id) AS total_karyawan,

@@ -19,9 +19,14 @@ async function getAllUsers(req, res) {
     `;
     const params = [];
 
-    if (['WADIR_PEND', 'WADIR_PENGS'].includes(req.user.role)) {
+    const branchRole = ['WADIR_PEND', 'WADIR_PENGS'].includes(req.user.role)
+      ? req.user.role
+      : (req.user.role === 'WAKIL_MUDIR' && ['WADIR_PEND', 'WADIR_PENGS'].includes(req.user.parent_role)
+        ? req.user.parent_role
+        : null);
+    if (branchRole) {
       query += ' AND (b.parent_role = ? OR u.id = ?)';
-      params.push(req.user.role, req.user.id);
+      params.push(branchRole, req.user.id);
     }
 
     if (role) {
@@ -69,11 +74,11 @@ async function getAssignees(req, res) {
       // Mudir / Super Admin boleh memilih SIAPA SAJA
       query += ' AND u.id != ?';
       params.push(id);
-    } else if (role === 'WAKIL_MUDIR') {
-      query += ' AND u.role IN (\'KABID\', \'STAF\')';
     } else if (role === 'WADIR_PEND' || role === 'WADIR_PENGS') {
-      query += ' AND u.role IN (\'KABID\', \'STAF\') AND b.parent_role = ?';
+      query += ' AND u.role = \'KABID\' AND b.parent_role = ?';
       params.push(role);
+    } else if (role === 'WAKIL_MUDIR') {
+      return res.json({ success: true, data: [] });
     } else if (role === 'KABID') {
       // Kabid -> Hanya boleh memilih Staf di bidangnya
       query += ' AND u.role = \'STAF\' AND u.bidang_id = ?';

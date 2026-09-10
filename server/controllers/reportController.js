@@ -24,6 +24,9 @@ async function getDashboardStats(req, res) {
     } else if (role === 'WADIR_PEND' || role === 'WADIR_PENGS') {
       whereClause += ' AND (EXISTS (SELECT 1 FROM bidang bx WHERE bx.id = bidang_id AND bx.parent_role = ?) OR created_by = ? OR assigned_to = ?)';
       params.push(role, userId, userId);
+    } else if (role === 'WAKIL_MUDIR') {
+      whereClause += ' AND (created_by = ? OR assigned_to = ?)';
+      params.push(userId, userId);
     }
 
     if (filterBidangId) {
@@ -62,6 +65,9 @@ async function getDashboardStats(req, res) {
     } else if (role === 'WADIR_PEND' || role === 'WADIR_PENGS') {
       periodWhere += ' AND (EXISTS (SELECT 1 FROM bidang bx WHERE bx.id = bidang_id AND bx.parent_role = ?) OR created_by = ? OR assigned_to = ?)';
       periodParams.push(role, userId, userId);
+    } else if (role === 'WAKIL_MUDIR') {
+      periodWhere += ' AND (created_by = ? OR assigned_to = ?)';
+      periodParams.push(userId, userId);
     }
     if (filterBidangId) {
       periodWhere += ' AND bidang_id = ?';
@@ -141,6 +147,9 @@ async function exportExcelReport(req, res) {
     } else if (role === 'WADIR_PEND' || role === 'WADIR_PENGS') {
       query += ' AND (b.parent_role = ? OR t.created_by = ? OR t.assigned_to = ?)';
       params.push(role, userId, userId);
+    } else if (role === 'WAKIL_MUDIR') {
+      query += ' AND (t.created_by = ? OR t.assigned_to = ?)';
+      params.push(userId, userId);
     }
 
     if (periode) {

@@ -22,8 +22,8 @@ export default function Sidebar({
   const { user } = useAuth();
   const role = user?.role;
 
-  const canCreateTask = ['SUPER_ADMIN', 'MUDIR', 'WAKIL_MUDIR', 'WADIR_PEND', 'WADIR_PENGS', 'KABID'].includes(role);
-  const canManageBidang = ['SUPER_ADMIN', 'MUDIR', 'WAKIL_MUDIR', 'WADIR_PEND', 'WADIR_PENGS'].includes(role);
+  const canCreateTask = ['SUPER_ADMIN', 'MUDIR', 'WADIR_PEND', 'WADIR_PENGS', 'KABID'].includes(role);
+  const canManageBidang = ['SUPER_ADMIN', 'MUDIR'].includes(role);
   const canManageUsers = ['SUPER_ADMIN', 'MUDIR'].includes(role);
 
   const navItems = [
