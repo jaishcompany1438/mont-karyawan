@@ -57,7 +57,7 @@ async function initDB() {
         nama VARCHAR(150) NOT NULL,
         email VARCHAR(150) UNIQUE NOT NULL,
         password VARCHAR(255) NOT NULL,
-        role ENUM('SUPER_ADMIN', 'MUDIR', 'WAKIL_MUDIR', 'KABID', 'STAF') NOT NULL,
+        role ENUM('SUPER_ADMIN', 'MUDIR', 'WAKIL_MUDIR', 'WADIR_PEND', 'WADIR_PENGS', 'KABID', 'STAF') NOT NULL,
         bidang_id INT NULL,
         jabatan VARCHAR(100) NULL,
         sub_bidang VARCHAR(100) NULL,
@@ -72,6 +72,7 @@ async function initDB() {
         id INT AUTO_INCREMENT PRIMARY KEY,
         judul VARCHAR(255) NOT NULL,
         deskripsi TEXT NULL,
+        parent_role ENUM('WADIR_PEND', 'WADIR_PENGS') NULL,
         periode ENUM('HARIAN', 'PEKANAN', 'BULANAN', 'TAHUNAN') NOT NULL DEFAULT 'HARIAN',
         kategori ENUM('RUTIN', 'PROYEK', 'MENDADAK') DEFAULT 'RUTIN',
         prioritas ENUM('RENDAH', 'SEDANG', 'TINGGI', 'URGEN') DEFAULT 'SEDANG',
@@ -97,6 +98,7 @@ async function initDB() {
     // Lightweight migrations for installations created before recurring tasks
     // and staff sub-bidang support were introduced.
     const migrations = [
+      ['bidang', 'parent_role', "ALTER TABLE bidang ADD COLUMN parent_role ENUM('WADIR_PEND','WADIR_PENGS') NULL AFTER deskripsi"],
       ['users', 'sub_bidang', 'ALTER TABLE users ADD COLUMN sub_bidang VARCHAR(100) NULL AFTER jabatan'],
       ['tasks', 'is_recurring', 'ALTER TABLE tasks ADD COLUMN is_recurring TINYINT(1) NOT NULL DEFAULT 0 AFTER due_date'],
       ['tasks', 'recurrence_parent_id', 'ALTER TABLE tasks ADD COLUMN recurrence_parent_id INT NULL AFTER is_recurring'],
@@ -109,6 +111,8 @@ async function initDB() {
       );
       if (!columns[0].present) await db.query(statement);
     }
+    // ALTER ENUMs rather than recreating users, preserving all existing data.
+    await db.query("ALTER TABLE users MODIFY COLUMN role ENUM('SUPER_ADMIN','MUDIR','WAKIL_MUDIR','WADIR_PEND','WADIR_PENGS','KABID','STAF') NOT NULL");
     // A period is the recurrence declaration for legacy periodic tasks.
     await db.query(`UPDATE tasks SET is_recurring = 1 WHERE periode IN ('HARIAN', 'PEKANAN', 'BULANAN') AND is_recurring = 0`);
 

@@ -13,6 +13,10 @@ export default function Navbar({ onMenuToggle }) {
         return { label: 'Mudir (Pimpinan)', bg: 'bg-amber-100 text-amber-900 border-amber-300 font-semibold' };
       case 'WAKIL_MUDIR':
         return { label: 'Wakil Mudir', bg: 'bg-indigo-100 text-indigo-800 border-indigo-200' };
+      case 'WADIR_PEND':
+        return { label: 'Wadir Pendidikan', bg: 'bg-indigo-100 text-indigo-800 border-indigo-200' };
+      case 'WADIR_PENGS':
+        return { label: 'Wadir Pengasuhan', bg: 'bg-cyan-100 text-cyan-800 border-cyan-200' };
       case 'KABID':
         return { label: 'Kepala Bidang', bg: 'bg-emerald-100 text-emerald-800 border-emerald-200' };
       case 'STAF':

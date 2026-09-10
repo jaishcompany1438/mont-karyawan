@@ -7,13 +7,15 @@ async function getAllBidang(req, res) {
     }
 
     const db = getPool();
+    const branchRole = ['WADIR_PEND', 'WADIR_PENGS'].includes(req.user.role) ? req.user.role : null;
     const [rows] = await db.query(`
       SELECT b.*,
              (SELECT COUNT(*) FROM users u WHERE u.bidang_id = b.id) AS total_karyawan,
              (SELECT COUNT(*) FROM tasks t WHERE t.bidang_id = b.id AND t.status != 'COMPLETED') AS active_tasks
       FROM bidang b
+      WHERE (? IS NULL OR b.parent_role = ?)
       ORDER BY b.nama_bidang ASC
-    `);
+    `, [branchRole, branchRole]);
 
     return res.json({ success: true, data: rows });
   } catch (error) {
@@ -23,7 +25,7 @@ async function getAllBidang(req, res) {
 
 async function createBidang(req, res) {
   try {
-    const { nama_bidang, kode_bidang, deskripsi } = req.body;
+    const { nama_bidang, kode_bidang, deskripsi, parent_role } = req.body;
     if (!nama_bidang || !kode_bidang) {
       return res.status(400).json({ success: false, message: 'Nama bidang dan kode bidang wajib diisi.' });
     }
@@ -36,14 +38,14 @@ async function createBidang(req, res) {
     }
 
     const [result] = await db.query(
-      'INSERT INTO bidang (nama_bidang, kode_bidang, deskripsi) VALUES (?, ?, ?)',
-      [nama_bidang.trim(), kode_bidang.trim().toUpperCase(), deskripsi || null]
+      'INSERT INTO bidang (nama_bidang, kode_bidang, deskripsi, parent_role) VALUES (?, ?, ?, ?)',
+      [nama_bidang.trim(), kode_bidang.trim().toUpperCase(), deskripsi || null, ['WADIR_PEND', 'WADIR_PENGS'].includes(parent_role) ? parent_role : null]
     );
 
     return res.status(201).json({
       success: true,
       message: 'Bidang berhasil ditambahkan.',
-      data: { id: result.insertId, nama_bidang, kode_bidang: kode_bidang.toUpperCase(), deskripsi }
+      data: { id: result.insertId, nama_bidang, kode_bidang: kode_bidang.toUpperCase(), deskripsi, parent_role }
     });
   } catch (error) {
     return res.status(500).json({ success: false, message: 'Gagal menambahkan bidang: ' + error.message });
@@ -53,7 +55,7 @@ async function createBidang(req, res) {
 async function updateBidang(req, res) {
   try {
     const { id } = req.params;
-    const { nama_bidang, kode_bidang, deskripsi } = req.body;
+    const { nama_bidang, kode_bidang, deskripsi, parent_role } = req.body;
 
     if (!nama_bidang || !kode_bidang) {
       return res.status(400).json({ success: false, message: 'Nama bidang dan kode bidang wajib diisi.' });
@@ -70,8 +72,8 @@ async function updateBidang(req, res) {
     }
 
     await db.query(
-      'UPDATE bidang SET nama_bidang = ?, kode_bidang = ?, deskripsi = ? WHERE id = ?',
-      [nama_bidang.trim(), kode_bidang.trim().toUpperCase(), deskripsi || null, id]
+      'UPDATE bidang SET nama_bidang = ?, kode_bidang = ?, deskripsi = ?, parent_role = ? WHERE id = ?',
+      [nama_bidang.trim(), kode_bidang.trim().toUpperCase(), deskripsi || null, ['WADIR_PEND', 'WADIR_PENGS'].includes(parent_role) ? parent_role : null, id]
     );
 
     return res.json({ success: true, message: 'Bidang berhasil diperbarui.' });

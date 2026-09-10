@@ -133,7 +133,9 @@ export default function Users({ refreshKey, onRefresh }) {
               <select required value={form.role} onChange={(e) => updateField('role', e.target.value)} className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-normal outline-none focus:ring-2 focus:ring-emerald-500">
                 <option value="STAF">STAF</option>
                 <option value="KABID">KABID</option>
-                <option value="WAKIL_MUDIR">WAKIL_MUDIR</option>
+                <option value="WAKIL_MUDIR">WAKIL_MUDIR (Legacy)</option>
+                <option value="WADIR_PEND">WADIR_PEND - Wadir Pendidikan</option>
+                <option value="WADIR_PENGS">WADIR_PENGS - Wadir Pengasuhan</option>
                 <option value="MUDIR">MUDIR</option>
                 <option value="SUPER_ADMIN">SUPER_ADMIN</option>
               </select>

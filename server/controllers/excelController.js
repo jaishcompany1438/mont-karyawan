@@ -68,7 +68,7 @@ async function downloadTemplate(req, res) {
         { header: 'Nama Lengkap', key: 'nama', width: 32 },
         { header: 'Email', key: 'email', width: 32 },
         { header: 'Password Awal', key: 'password', width: 22 },
-        { header: 'Role (MUDIR/WAKIL_MUDIR/KABID/STAF)', key: 'role', width: 36 },
+        { header: 'Role (MUDIR/WAKIL_MUDIR/WADIR_PEND/WADIR_PENGS/KABID/STAF)', key: 'role', width: 44 },
         { header: 'Kode Bidang', key: 'kode_bidang', width: 20 },
         { header: 'Jabatan', key: 'jabatan', width: 30 },
         { header: 'Sub-Bidang / Unit', key: 'sub_bidang', width: 30 }
@@ -97,7 +97,7 @@ async function downloadTemplate(req, res) {
       sheet.dataValidations.add('D2:D1000', {
         type: 'list',
         allowBlank: false,
-        formulae: ['"MUDIR,WAKIL_MUDIR,KABID,STAF"']
+        formulae: ['"MUDIR,WAKIL_MUDIR,WADIR_PEND,WADIR_PENGS,KABID,STAF"']
       });
 
       res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
@@ -110,7 +110,8 @@ async function downloadTemplate(req, res) {
       sheet.columns = [
         { header: 'Kode Bidang', key: 'kode_bidang', width: 22 },
         { header: 'Nama Bidang', key: 'nama_bidang', width: 35 },
-        { header: 'Deskripsi / Sub-Divisi', key: 'deskripsi', width: 50 }
+        { header: 'Deskripsi / Sub-Divisi', key: 'deskripsi', width: 50 },
+        { header: 'Cabang (WADIR_PEND/WADIR_PENGS)', key: 'parent_role', width: 34 }
       ];
 
       const headerRow = sheet.getRow(1);
@@ -126,7 +127,8 @@ async function downloadTemplate(req, res) {
       sheet.addRow({
         kode_bidang: 'HUMAS',
         nama_bidang: 'Hubungan Masyarakat & Kemitraan',
-        deskripsi: 'Pengelolaan relasi wali santri, lembaga mitra, dan donatur'
+        deskripsi: 'Pengelolaan relasi wali santri, lembaga mitra, dan donatur',
+        parent_role: 'WADIR_PENGS'
       });
 
       res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
@@ -197,12 +199,17 @@ async function importTasks(req, res) {
       try {
         // Find assignee
         const [users] = await db.query(
-          'SELECT id, role, bidang_id FROM users WHERE email = ? LIMIT 1',
+          'SELECT u.id, u.role, u.bidang_id, b.parent_role FROM users u LEFT JOIN bidang b ON b.id = u.bidang_id WHERE u.email = ? LIMIT 1',
           [item.emailAssignee]
         );
 
         if (users.length === 0) {
           errors.push(`Baris ${item.rowNumber}: Email penerima "${item.emailAssignee}" tidak ditemukan.`);
+          continue;
+        }
+        if ((role === 'WADIR_PEND' || role === 'WADIR_PENGS') &&
+            (!['KABID', 'STAF'].includes(assignee.role) || assignee.parent_role !== role)) {
+          errors.push(`Baris ${item.rowNumber}: Wadir hanya dapat menugaskan ke Kabid atau Staf.`);
           continue;
         }
 
@@ -328,7 +335,7 @@ async function importKaryawan(req, res) {
 
     for (const item of rows) {
       try {
-        const validRoles = ['SUPER_ADMIN', 'MUDIR', 'WAKIL_MUDIR', 'KABID', 'STAF'];
+        const validRoles = ['SUPER_ADMIN', 'MUDIR', 'WAKIL_MUDIR', 'WADIR_PEND', 'WADIR_PENGS', 'KABID', 'STAF'];
         if (!validRoles.includes(item.role)) {
           errors.push(`Baris ${item.rowNumber}: Role "${item.role}" tidak valid.`);
           continue;
@@ -397,9 +404,10 @@ async function importBidang(req, res) {
         const kode_bidang = row.getCell(1).text?.trim().toUpperCase();
         const nama_bidang = row.getCell(2).text?.trim();
         const deskripsi = row.getCell(3).text?.trim();
+        const parent_role = row.getCell(4).text?.trim().toUpperCase();
 
         if (kode_bidang && nama_bidang) {
-          rows.push({ rowNumber, kode_bidang, nama_bidang, deskripsi });
+          rows.push({ rowNumber, kode_bidang, nama_bidang, deskripsi, parent_role });
         }
       }
     });
@@ -409,13 +417,13 @@ async function importBidang(req, res) {
         const [existing] = await db.query('SELECT id FROM bidang WHERE kode_bidang = ?', [item.kode_bidang]);
         if (existing.length > 0) {
           await db.query(
-            'UPDATE bidang SET nama_bidang = ?, deskripsi = ? WHERE id = ?',
-            [item.nama_bidang, item.deskripsi || null, existing[0].id]
+            'UPDATE bidang SET nama_bidang = ?, deskripsi = ?, parent_role = ? WHERE id = ?',
+            [item.nama_bidang, item.deskripsi || null, ['WADIR_PEND', 'WADIR_PENGS'].includes(item.parent_role) ? item.parent_role : null, existing[0].id]
           );
         } else {
           await db.query(
-            'INSERT INTO bidang (kode_bidang, nama_bidang, deskripsi) VALUES (?, ?, ?)',
-            [item.kode_bidang, item.nama_bidang, item.deskripsi || null]
+            'INSERT INTO bidang (kode_bidang, nama_bidang, deskripsi, parent_role) VALUES (?, ?, ?, ?)',
+            [item.kode_bidang, item.nama_bidang, item.deskripsi || null, ['WADIR_PEND', 'WADIR_PENGS'].includes(item.parent_role) ? item.parent_role : null]
           );
         }
         importedCount++;

@@ -79,7 +79,7 @@ export default function TaskTable({
                 const statusBadge = getStatusBadge(task.status);
                 const isOverdue = task.status !== 'COMPLETED' && new Date(task.due_date) < new Date();
                 const isAssignee = task.assigned_to === user?.id;
-                const canReview = ['SUPER_ADMIN', 'MUDIR', 'WAKIL_MUDIR'].includes(role) ||
+                const canReview = ['SUPER_ADMIN', 'MUDIR', 'WAKIL_MUDIR', 'WADIR_PEND', 'WADIR_PENGS'].includes(role) ||
                                   task.created_by === user?.id ||
                                   (role === 'KABID' && task.bidang_id === user?.bidang_id);
                 const canEdit = ['SUPER_ADMIN', 'MUDIR'].includes(role) || task.created_by === user?.id;

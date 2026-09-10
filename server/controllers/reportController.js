@@ -21,6 +21,9 @@ async function getDashboardStats(req, res) {
     } else if (role === 'KABID') {
       whereClause += ' AND (bidang_id = ? OR created_by = ? OR assigned_to = ?)';
       params.push(bidang_id, userId, userId);
+    } else if (role === 'WADIR_PEND' || role === 'WADIR_PENGS') {
+      whereClause += ' AND (EXISTS (SELECT 1 FROM bidang bx WHERE bx.id = bidang_id AND bx.parent_role = ?) OR created_by = ? OR assigned_to = ?)';
+      params.push(role, userId, userId);
     }
 
     if (filterBidangId) {
@@ -56,6 +59,9 @@ async function getDashboardStats(req, res) {
     } else if (role === 'KABID') {
       periodWhere += ' AND (bidang_id = ? OR created_by = ? OR assigned_to = ?)';
       periodParams.push(bidang_id, userId, userId);
+    } else if (role === 'WADIR_PEND' || role === 'WADIR_PENGS') {
+      periodWhere += ' AND (EXISTS (SELECT 1 FROM bidang bx WHERE bx.id = bidang_id AND bx.parent_role = ?) OR created_by = ? OR assigned_to = ?)';
+      periodParams.push(role, userId, userId);
     }
     if (filterBidangId) {
       periodWhere += ' AND bidang_id = ?';
@@ -75,7 +81,7 @@ async function getDashboardStats(req, res) {
 
     // Department completion summary (for leadership / Mudir / Wakil Mudir / Super Admin)
     let departmentSummary = [];
-    if (['SUPER_ADMIN', 'MUDIR', 'WAKIL_MUDIR'].includes(role)) {
+    if (['SUPER_ADMIN', 'MUDIR', 'WAKIL_MUDIR', 'WADIR_PEND', 'WADIR_PENGS'].includes(role)) {
       const [deptRows] = await db.query(`
         SELECT
           b.id, b.nama_bidang, b.kode_bidang,
@@ -87,9 +93,10 @@ async function getDashboardStats(req, res) {
           SUM(CASE WHEN t.status != 'COMPLETED' AND t.due_date < NOW() THEN 1 ELSE 0 END) AS overdue_tasks
         FROM bidang b
         LEFT JOIN tasks t ON b.id = t.bidang_id
+        WHERE (? IS NULL OR b.parent_role = ?)
         GROUP BY b.id
         ORDER BY b.nama_bidang ASC
-      `);
+      `, [role === 'WADIR_PEND' || role === 'WADIR_PENGS' ? role : null, role]);
       departmentSummary = deptRows;
     }
 
@@ -131,6 +138,9 @@ async function exportExcelReport(req, res) {
     } else if (role === 'KABID') {
       query += ' AND (t.bidang_id = ? OR t.created_by = ? OR t.assigned_to = ?)';
       params.push(bidang_id, userId, userId);
+    } else if (role === 'WADIR_PEND' || role === 'WADIR_PENGS') {
+      query += ' AND (b.parent_role = ? OR t.created_by = ? OR t.assigned_to = ?)';
+      params.push(role, userId, userId);
     }
 
     if (periode) {

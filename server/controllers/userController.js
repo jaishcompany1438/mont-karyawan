@@ -12,12 +12,17 @@ async function getAllUsers(req, res) {
 
     let query = `
       SELECT u.id, u.nama, u.email, u.role, u.bidang_id, u.jabatan, u.sub_bidang, u.created_at,
-             b.nama_bidang, b.kode_bidang
+             b.nama_bidang, b.kode_bidang, b.parent_role
       FROM users u
       LEFT JOIN bidang b ON u.bidang_id = b.id
       WHERE 1=1
     `;
     const params = [];
+
+    if (['WADIR_PEND', 'WADIR_PENGS'].includes(req.user.role)) {
+      query += ' AND (b.parent_role = ? OR u.id = ?)';
+      params.push(req.user.role, req.user.id);
+    }
 
     if (role) {
       query += ' AND u.role = ?';
@@ -53,7 +58,7 @@ async function getAssignees(req, res) {
 
     let query = `
       SELECT u.id, u.nama, u.email, u.role, u.bidang_id, u.jabatan, u.sub_bidang,
-             b.nama_bidang, b.kode_bidang
+             b.nama_bidang, b.kode_bidang, b.parent_role
       FROM users u
       LEFT JOIN bidang b ON u.bidang_id = b.id
       WHERE 1=1
@@ -65,8 +70,10 @@ async function getAssignees(req, res) {
       query += ' AND u.id != ?';
       params.push(id);
     } else if (role === 'WAKIL_MUDIR') {
-      // Wakil Mudir -> Boleh memilih Kabid atau Staf
       query += ' AND u.role IN (\'KABID\', \'STAF\')';
+    } else if (role === 'WADIR_PEND' || role === 'WADIR_PENGS') {
+      query += ' AND u.role IN (\'KABID\', \'STAF\') AND b.parent_role = ?';
+      params.push(role);
     } else if (role === 'KABID') {
       // Kabid -> Hanya boleh memilih Staf di bidangnya
       query += ' AND u.role = \'STAF\' AND u.bidang_id = ?';
@@ -92,7 +99,7 @@ async function createUser(req, res) {
       return res.status(400).json({ success: false, message: 'Nama, email, password, dan role wajib diisi.' });
     }
 
-    const validRoles = ['SUPER_ADMIN', 'MUDIR', 'WAKIL_MUDIR', 'KABID', 'STAF'];
+    const validRoles = ['SUPER_ADMIN', 'MUDIR', 'WAKIL_MUDIR', 'WADIR_PEND', 'WADIR_PENGS', 'KABID', 'STAF'];
     if (!validRoles.includes(role)) {
       return res.status(400).json({ success: false, message: 'Role tidak valid.' });
     }
@@ -131,6 +138,8 @@ async function updateUser(req, res) {
       return res.status(400).json({ success: false, message: 'Nama, email, dan role wajib diisi.' });
     }
 
+    const validRoles = ['SUPER_ADMIN', 'MUDIR', 'WAKIL_MUDIR', 'WADIR_PEND', 'WADIR_PENGS', 'KABID', 'STAF'];
+    if (!validRoles.includes(role)) return res.status(400).json({ success: false, message: 'Role tidak valid.' });
     const db = getPool();
     const [existing] = await db.query('SELECT id FROM users WHERE email = ? AND id != ?', [
       email.trim().toLowerCase(),

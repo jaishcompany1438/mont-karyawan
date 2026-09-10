@@ -21,7 +21,7 @@ async function getTasks(req, res) {
              creator.nama AS creator_nama, creator.role AS creator_role,
              assignee.nama AS assignee_nama, assignee.email AS assignee_email, assignee.jabatan AS assignee_jabatan,
              assignee.sub_bidang AS assignee_sub_bidang,
-             b.nama_bidang, b.kode_bidang
+             b.nama_bidang, b.kode_bidang, b.parent_role
       FROM tasks t
       JOIN users creator ON t.created_by = creator.id
       JOIN users assignee ON t.assigned_to = assignee.id
@@ -39,8 +39,11 @@ async function getTasks(req, res) {
       // Kabid sees tasks in their bidang OR created by them OR assigned to them
       query += ' AND (t.bidang_id = ? OR t.created_by = ? OR t.assigned_to = ?)';
       params.push(bidang_id, userId, userId);
+    } else if (role === 'WADIR_PEND' || role === 'WADIR_PENGS') {
+      query += ' AND (b.parent_role = ? OR t.created_by = ? OR t.assigned_to = ?)';
+      params.push(role, userId, userId);
     }
-    // SUPER_ADMIN, MUDIR, WAKIL_MUDIR can view all tasks cross-department
+    // SUPER_ADMIN, MUDIR and legacy WAKIL_MUDIR can view all tasks.
 
     // Period filter (PRD 3.2: HARIAN, PEKANAN, BULANAN, TAHUNAN)
     if (periode && ['HARIAN', 'PEKANAN', 'BULANAN', 'TAHUNAN'].includes(periode.toUpperCase())) {
@@ -104,7 +107,7 @@ async function getTaskById(req, res) {
               creator.nama AS creator_nama, creator.role AS creator_role,
               assignee.nama AS assignee_nama, assignee.email AS assignee_email, assignee.jabatan AS assignee_jabatan,
               assignee.sub_bidang AS assignee_sub_bidang,
-              b.nama_bidang, b.kode_bidang
+              b.nama_bidang, b.kode_bidang, b.parent_role
        FROM tasks t
        JOIN users creator ON t.created_by = creator.id
        JOIN users assignee ON t.assigned_to = assignee.id
@@ -123,6 +126,10 @@ async function getTaskById(req, res) {
     // Check RBAC read permission
     if (role === 'STAF' && task.assigned_to !== userId) {
       return res.status(403).json({ success: false, message: 'Anda tidak memiliki hak akses ke tugas ini.' });
+    }
+    if ((role === 'WADIR_PEND' || role === 'WADIR_PENGS') &&
+        task.created_by !== userId && task.assigned_to !== userId && task.parent_role !== role) {
+      return res.status(403).json({ success: false, message: 'Anda tidak memiliki hak akses ke tugas di cabang ini.' });
     }
     if (role === 'KABID' && task.bidang_id !== bidang_id && task.created_by !== userId && task.assigned_to !== userId) {
       return res.status(403).json({ success: false, message: 'Anda tidak memiliki hak akses ke tugas di bidang lain.' });
@@ -188,6 +195,11 @@ async function createTask(req, res) {
           message: 'Wakil Mudir hanya dapat memberikan tugas kepada Kepala Bidang atau Staf.'
         });
       }
+    } else if (role === 'WADIR_PEND' || role === 'WADIR_PENGS') {
+      const [branchRows] = await db.query('SELECT parent_role FROM bidang WHERE id = ?', [assignee.bidang_id]);
+      if (!['KABID', 'STAF'].includes(assignee.role) || !branchRows[0] || branchRows[0].parent_role !== role) {
+        return res.status(403).json({ success: false, message: 'Wadir hanya dapat menugaskan kepada Kabid atau Staf di bidang cabangnya.' });
+      }
     }
     // Mudir / Super Admin: bebas memilih siapa saja
 
@@ -195,6 +207,12 @@ async function createTask(req, res) {
     const targetBidangId = bidang_id || assignee.bidang_id || creatorBidangId;
     if (!targetBidangId) {
       return res.status(400).json({ success: false, message: 'Bidang penugasan harus ditentukan.' });
+    }
+    if (role === 'WADIR_PEND' || role === 'WADIR_PENGS') {
+      const [targetBranch] = await db.query('SELECT parent_role FROM bidang WHERE id = ?', [targetBidangId]);
+      if (!targetBranch[0] || targetBranch[0].parent_role !== role) {
+        return res.status(403).json({ success: false, message: 'Bidang tugas harus berada di cabang Wadir.' });
+      }
     }
 
     const file_attachment = req.file ? `/uploads/${req.file.filename}` : (req.body.file_attachment || null);
@@ -239,7 +257,7 @@ async function updateTask(req, res) {
     const { role, id: userId, bidang_id: userBidangId } = req.user;
     const db = getPool();
 
-    const [rows] = await db.query('SELECT * FROM tasks WHERE id = ?', [id]);
+    const [rows] = await db.query('SELECT t.*, b.parent_role FROM tasks t JOIN bidang b ON b.id = t.bidang_id WHERE t.id = ?', [id]);
     if (rows.length === 0) {
       return res.status(404).json({ success: false, message: 'Tugas tidak ditemukan.' });
     }
@@ -251,8 +269,9 @@ async function updateTask(req, res) {
       role === 'MUDIR' ||
       task.created_by === userId ||
       (role === 'KABID' && task.bidang_id === userBidangId);
+    const wadirEdit = (role === 'WADIR_PEND' || role === 'WADIR_PENGS') && task.parent_role === role;
 
-    if (!canEdit) {
+    if (!canEdit && !wadirEdit) {
       return res.status(403).json({ success: false, message: 'Anda tidak berhak mengedit detail tugas ini.' });
     }
 
@@ -268,6 +287,15 @@ async function updateTask(req, res) {
       due_date,
       is_recurring
     } = req.body;
+    if (role === 'WADIR_PEND' || role === 'WADIR_PENGS') {
+      const [candidate] = await db.query(
+        `SELECT u.role, b.parent_role FROM users u LEFT JOIN bidang b ON u.bidang_id = b.id WHERE u.id = ?`,
+        [assigned_to || task.assigned_to]
+      );
+      if (!candidate[0] || !['KABID', 'STAF'].includes(candidate[0].role) || candidate[0].parent_role !== role) {
+        return res.status(403).json({ success: false, message: 'Wadir hanya dapat menugaskan ke Kabid/Staf di cabangnya.' });
+      }
+    }
 
     const file_attachment = req.file ? `/uploads/${req.file.filename}` : (req.body.file_attachment !== undefined ? req.body.file_attachment : task.file_attachment);
 
@@ -312,7 +340,7 @@ async function updateTaskStatus(req, res) {
     }
 
     const db = getPool();
-    const [rows] = await db.query('SELECT * FROM tasks WHERE id = ?', [id]);
+    const [rows] = await db.query('SELECT t.*, b.parent_role FROM tasks t JOIN bidang b ON b.id = t.bidang_id WHERE t.id = ?', [id]);
     if (rows.length === 0) {
       return res.status(404).json({ success: false, message: 'Tugas tidak ditemukan.' });
     }
@@ -338,7 +366,7 @@ async function submitReview(req, res) {
     const { keterangan } = req.body;
 
     const db = getPool();
-    const [rows] = await db.query('SELECT * FROM tasks WHERE id = ?', [id]);
+    const [rows] = await db.query('SELECT t.*, b.parent_role FROM tasks t JOIN bidang b ON b.id = t.bidang_id WHERE t.id = ?', [id]);
     if (rows.length === 0) {
       return res.status(404).json({ success: false, message: 'Tugas tidak ditemukan.' });
     }
@@ -391,12 +419,15 @@ async function reviewTask(req, res) {
     const task = rows[0];
 
     // Authorization: Super Admin, Mudir, Wakil Mudir, task creator, or Kabid of the department
+    const [taskWithBranch] = await db.query('SELECT parent_role FROM bidang WHERE id = ?', [task.bidang_id]);
+    task.parent_role = taskWithBranch[0] && taskWithBranch[0].parent_role;
     const canReview =
       role === 'SUPER_ADMIN' ||
       role === 'MUDIR' ||
       role === 'WAKIL_MUDIR' ||
       task.created_by === userId ||
-      (role === 'KABID' && task.bidang_id === userBidangId);
+      (role === 'KABID' && task.bidang_id === userBidangId) ||
+      ((role === 'WADIR_PEND' || role === 'WADIR_PENGS') && task.parent_role === role);
 
     if (!canReview) {
       return res.status(403).json({

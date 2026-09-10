@@ -27,7 +27,7 @@ function statusLabel(status) {
 export default function MobileTaskGroups({ tasks = [], onOpenSubmitWork, onOpenReview, onStartTask }) {
   const { user } = useAuth();
   const role = user?.role;
-  const canReview = (task) => ['SUPER_ADMIN', 'MUDIR', 'WAKIL_MUDIR'].includes(role)
+  const canReview = (task) => ['SUPER_ADMIN', 'MUDIR', 'WAKIL_MUDIR', 'WADIR_PEND', 'WADIR_PENGS'].includes(role)
     || task.created_by === user?.id
     || (role === 'KABID' && task.bidang_id === user?.bidang_id);
 
