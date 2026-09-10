@@ -10,6 +10,7 @@ export default function TaskModal({ isOpen, onClose, onSuccess, initialTask = nu
   const [prioritas, setPrioritas] = useState('SEDANG');
   const [assignedTo, setAssignedTo] = useState('');
   const [dueDate, setDueDate] = useState('');
+  const [isRecurring, setIsRecurring] = useState(true);
   const [attachment, setAttachment] = useState(null);
 
   const [assignees, setAssignees] = useState([]);
@@ -26,6 +27,7 @@ export default function TaskModal({ isOpen, onClose, onSuccess, initialTask = nu
         setKategori(initialTask.kategori || 'RUTIN');
         setPrioritas(initialTask.prioritas || 'SEDANG');
         setAssignedTo(initialTask.assigned_to || '');
+        setIsRecurring(Boolean(initialTask.is_recurring));
         if (initialTask.due_date) {
           const date = new Date(initialTask.due_date);
           setDueDate(date.toISOString().slice(0, 16));
@@ -43,6 +45,7 @@ export default function TaskModal({ isOpen, onClose, onSuccess, initialTask = nu
         tomorrow.setHours(17, 0, 0, 0);
         setDueDate(tomorrow.toISOString().slice(0, 16));
         setAttachment(null);
+        setIsRecurring(true);
       }
       setError('');
     }
@@ -83,6 +86,7 @@ export default function TaskModal({ isOpen, onClose, onSuccess, initialTask = nu
       formData.append('prioritas', prioritas);
       formData.append('assigned_to', assignedTo);
       formData.append('due_date', dueDate);
+      formData.append('is_recurring', isRecurring ? '1' : '0');
 
       if (attachment) {
         formData.append('attachment', attachment);
@@ -217,6 +221,16 @@ export default function TaskModal({ isOpen, onClose, onSuccess, initialTask = nu
                 ))}
               </select>
             </div>
+
+            {['HARIAN', 'PEKANAN', 'BULANAN'].includes(periode) && (
+              <label className="flex items-start gap-3 rounded-xl border border-emerald-200 bg-emerald-50/60 p-3">
+                <input type="checkbox" checked={isRecurring} onChange={(e) => setIsRecurring(e.target.checked)} className="mt-0.5 h-4 w-4 accent-emerald-700" />
+                <span>
+                  <span className="block font-bold text-emerald-900">Jadikan pekerjaan berulang</span>
+                  <span className="mt-0.5 block text-[11px] text-emerald-800">Instance tugas berikutnya dibuat otomatis setiap {periode === 'HARIAN' ? 'hari' : periode === 'PEKANAN' ? 'pekan' : 'bulan'} setelah tenggat.</span>
+                </span>
+              </label>
+            )}
 
             <div>
               <label className="block font-bold text-slate-700 mb-1">Tenggat Waktu (Due Date) *</label>

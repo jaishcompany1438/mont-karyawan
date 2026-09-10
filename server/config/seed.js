@@ -41,12 +41,14 @@ async function seedData() {
     const kurikId = kurikRes.insertId;
     const kesanId = kesanRes.insertId;
     const sarprasId = sarprasRes.insertId;
+    await db.query("UPDATE bidang SET parent_role = CASE kode_bidang WHEN 'KURIK' THEN 'WADIR_PEND' WHEN 'KESAN' THEN 'WADIR_PENGS' ELSE NULL END WHERE id IN (?, ?, ?, ?)", [itId, kurikId, kesanId, sarprasId]);
 
     // Hash passwords
     const salt = await bcrypt.genSalt(10);
     const defaultPassword = await bcrypt.hash('admin123', salt);
     const mudirPassword = await bcrypt.hash('mudir123', salt);
-    const wakilPassword = await bcrypt.hash('wakil123', salt);
+    const wadirPendPassword = await bcrypt.hash('wadirpend123', salt);
+    const wadirPengsPassword = await bcrypt.hash('wadirpengs123', salt);
     const kabidPassword = await bcrypt.hash('kabid123', salt);
     const stafPassword = await bcrypt.hash('staf123', salt);
 
@@ -61,9 +63,14 @@ async function seedData() {
       ['Ustadz Pimpinan Mudir', 'mudir@thobari.sch.id', mudirPassword, 'MUDIR', null, 'Mudir Pesantren']
     );
 
-    const [wakilUser] = await db.query(
+    await db.query(
       'INSERT INTO users (nama, email, password, role, bidang_id, jabatan) VALUES (?, ?, ?, ?, ?, ?)',
-      ['Ustadz Wakil Mudir', 'wakil.mudir@thobari.sch.id', wakilPassword, 'WAKIL_MUDIR', null, 'Wakil Mudir Operasional']
+      ['Ustadz Wadir Pendidikan', 'wadir.pendidikan@thobari.sch.id', wadirPendPassword, 'WADIR_PEND', null, 'Wakil Mudir Pendidikan']
+    );
+
+    await db.query(
+      'INSERT INTO users (nama, email, password, role, bidang_id, jabatan) VALUES (?, ?, ?, ?, ?, ?)',
+      ['Ustadz Wadir Pengasuhan', 'wadir.pengasuhan@thobari.sch.id', wadirPengsPassword, 'WADIR_PENGS', null, 'Wakil Mudir Pengasuhan']
     );
 
     const [kabidItUser] = await db.query(

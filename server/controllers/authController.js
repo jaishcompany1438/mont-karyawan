@@ -19,8 +19,8 @@ async function login(req, res) {
 
     const db = getPool();
     const [rows] = await db.query(
-      `SELECT u.id, u.nama, u.email, u.password, u.role, u.bidang_id, u.jabatan,
-              b.nama_bidang, b.kode_bidang
+      `SELECT u.id, u.nama, u.email, u.password, u.role, u.bidang_id, u.jabatan, u.sub_bidang,
+              b.nama_bidang, b.kode_bidang, b.parent_role
        FROM users u
        LEFT JOIN bidang b ON u.bidang_id = b.id
        WHERE u.email = ? LIMIT 1`,
@@ -45,7 +45,9 @@ async function login(req, res) {
       bidang_id: user.bidang_id,
       nama_bidang: user.nama_bidang,
       kode_bidang: user.kode_bidang,
-      jabatan: user.jabatan
+      jabatan: user.jabatan,
+      sub_bidang: user.sub_bidang
+      ,parent_role: user.parent_role
     };
 
     const token = jwt.sign(payload, JWT_SECRET, { expiresIn: process.env.JWT_EXPIRES_IN || '7d' });
@@ -70,8 +72,8 @@ async function getMe(req, res) {
 
     const db = getPool();
     const [rows] = await db.query(
-      `SELECT u.id, u.nama, u.email, u.role, u.bidang_id, u.jabatan,
-              b.nama_bidang, b.kode_bidang
+      `SELECT u.id, u.nama, u.email, u.role, u.bidang_id, u.jabatan, u.sub_bidang,
+              b.nama_bidang, b.kode_bidang, b.parent_role
        FROM users u
        LEFT JOIN bidang b ON u.bidang_id = b.id
        WHERE u.id = ? LIMIT 1`,

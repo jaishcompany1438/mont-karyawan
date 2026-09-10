@@ -16,8 +16,10 @@ import Reports from './pages/Reports';
 function AuthenticatedApp() {
   const { isAuthenticated, loading } = useAuth();
   const [activeTab, setActiveTab] = useState('dashboard');
+  const [taskFilters, setTaskFilters] = useState({});
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [taskModalOpen, setTaskModalOpen] = useState(false);
+  const [editTask, setEditTask] = useState(null);
   const [uploadModalOpen, setUploadModalOpen] = useState(false);
   const [submitTask, setSubmitTask] = useState(null);
   const [refreshKey, setRefreshKey] = useState(0);
@@ -36,18 +38,20 @@ function AuthenticatedApp() {
 
   const pageProps = { refreshKey, onRefresh: refresh };
   const page = {
-    dashboard: <Dashboard {...pageProps} onNavigate={setActiveTab} />,
+    dashboard: <Dashboard {...pageProps} onNavigate={(tab, filters = {}) => { setTaskFilters(filters); setActiveTab(tab); }} />,
     tasks: (
       <Tasks
         {...pageProps}
+        initialFilters={taskFilters}
         onOpenCreateTask={() => setTaskModalOpen(true)}
+        onOpenEditTask={(task) => { setEditTask(task); setTaskModalOpen(true); }}
         onOpenSubmitWork={setSubmitTask}
       />
     ),
     departments: <Departments {...pageProps} />,
     users: <Users {...pageProps} />,
     reports: <Reports {...pageProps} />,
-  }[activeTab] || <Dashboard {...pageProps} onNavigate={setActiveTab} />;
+  }[activeTab] || <Dashboard {...pageProps} onNavigate={(tab, filters = {}) => { setTaskFilters(filters); setActiveTab(tab); }} />;
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -63,7 +67,7 @@ function AuthenticatedApp() {
         />
         <main className="min-w-0 flex-1 p-4 sm:p-6 lg:p-8">{page}</main>
       </div>
-      <TaskModal isOpen={taskModalOpen} onClose={() => setTaskModalOpen(false)} onSuccess={refresh} />
+      <TaskModal isOpen={taskModalOpen} initialTask={editTask} onClose={() => { setTaskModalOpen(false); setEditTask(null); }} onSuccess={refresh} />
       <ExcelUploadModal isOpen={uploadModalOpen} onClose={() => setUploadModalOpen(false)} onSuccess={refresh} />
       <SubmitWorkModal
         isOpen={Boolean(submitTask)}

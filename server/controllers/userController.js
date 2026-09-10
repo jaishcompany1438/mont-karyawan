@@ -11,13 +11,23 @@ async function getAllUsers(req, res) {
     const db = getPool();
 
     let query = `
-      SELECT u.id, u.nama, u.email, u.role, u.bidang_id, u.jabatan, u.created_at,
-             b.nama_bidang, b.kode_bidang
+      SELECT u.id, u.nama, u.email, u.role, u.bidang_id, u.jabatan, u.sub_bidang, u.created_at,
+             b.nama_bidang, b.kode_bidang, b.parent_role
       FROM users u
       LEFT JOIN bidang b ON u.bidang_id = b.id
       WHERE 1=1
     `;
     const params = [];
+
+    const branchRole = ['WADIR_PEND', 'WADIR_PENGS'].includes(req.user.role)
+      ? req.user.role
+      : (req.user.role === 'WAKIL_MUDIR' && ['WADIR_PEND', 'WADIR_PENGS'].includes(req.user.parent_role)
+        ? req.user.parent_role
+        : null);
+    if (branchRole) {
+      query += ' AND (b.parent_role = ? OR u.id = ?)';
+      params.push(branchRole, req.user.id);
+    }
 
     if (role) {
       query += ' AND u.role = ?';
@@ -28,8 +38,8 @@ async function getAllUsers(req, res) {
       params.push(bidang_id);
     }
     if (search) {
-      query += ' AND (u.nama LIKE ? OR u.email LIKE ? OR u.jabatan LIKE ?)';
-      params.push(`%${search}%`, `%${search}%`, `%${search}%`);
+      query += ' AND (u.nama LIKE ? OR u.email LIKE ? OR u.jabatan LIKE ? OR u.sub_bidang LIKE ?)';
+      params.push(`%${search}%`, `%${search}%`, `%${search}%`, `%${search}%`);
     }
 
     query += ' ORDER BY u.nama ASC';
@@ -52,8 +62,8 @@ async function getAssignees(req, res) {
     const db = getPool();
 
     let query = `
-      SELECT u.id, u.nama, u.email, u.role, u.bidang_id, u.jabatan,
-             b.nama_bidang, b.kode_bidang
+      SELECT u.id, u.nama, u.email, u.role, u.bidang_id, u.jabatan, u.sub_bidang,
+             b.nama_bidang, b.kode_bidang, b.parent_role
       FROM users u
       LEFT JOIN bidang b ON u.bidang_id = b.id
       WHERE 1=1
@@ -64,9 +74,11 @@ async function getAssignees(req, res) {
       // Mudir / Super Admin boleh memilih SIAPA SAJA
       query += ' AND u.id != ?';
       params.push(id);
+    } else if (role === 'WADIR_PEND' || role === 'WADIR_PENGS') {
+      query += ' AND u.role = \'KABID\' AND b.parent_role = ?';
+      params.push(role);
     } else if (role === 'WAKIL_MUDIR') {
-      // Wakil Mudir -> Boleh memilih Kabid atau Staf
-      query += ' AND u.role IN (\'KABID\', \'STAF\')';
+      return res.json({ success: true, data: [] });
     } else if (role === 'KABID') {
       // Kabid -> Hanya boleh memilih Staf di bidangnya
       query += ' AND u.role = \'STAF\' AND u.bidang_id = ?';
@@ -87,12 +99,12 @@ async function getAssignees(req, res) {
 
 async function createUser(req, res) {
   try {
-    const { nama, email, password, role, bidang_id, jabatan } = req.body;
+    const { nama, email, password, role, bidang_id, jabatan, sub_bidang } = req.body;
     if (!nama || !email || !password || !role) {
       return res.status(400).json({ success: false, message: 'Nama, email, password, dan role wajib diisi.' });
     }
 
-    const validRoles = ['SUPER_ADMIN', 'MUDIR', 'WAKIL_MUDIR', 'KABID', 'STAF'];
+    const validRoles = ['SUPER_ADMIN', 'MUDIR', 'WAKIL_MUDIR', 'WADIR_PEND', 'WADIR_PENGS', 'KABID', 'STAF'];
     if (!validRoles.includes(role)) {
       return res.status(400).json({ success: false, message: 'Role tidak valid.' });
     }
@@ -107,15 +119,15 @@ async function createUser(req, res) {
     const hashedPassword = await bcrypt.hash(password, salt);
 
     const [result] = await db.query(
-      `INSERT INTO users (nama, email, password, role, bidang_id, jabatan)
-       VALUES (?, ?, ?, ?, ?, ?)`,
-      [nama.trim(), email.trim().toLowerCase(), hashedPassword, role, bidang_id || null, jabatan || null]
+      `INSERT INTO users (nama, email, password, role, bidang_id, jabatan, sub_bidang)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      [nama.trim(), email.trim().toLowerCase(), hashedPassword, role, bidang_id || null, jabatan || null, sub_bidang || null]
     );
 
     return res.status(201).json({
       success: true,
       message: 'Pengguna berhasil ditambahkan.',
-      data: { id: result.insertId, nama, email, role, bidang_id, jabatan }
+      data: { id: result.insertId, nama, email, role, bidang_id, jabatan, sub_bidang }
     });
   } catch (error) {
     return res.status(500).json({ success: false, message: 'Gagal menambahkan pengguna: ' + error.message });
@@ -125,12 +137,14 @@ async function createUser(req, res) {
 async function updateUser(req, res) {
   try {
     const { id } = req.params;
-    const { nama, email, password, role, bidang_id, jabatan } = req.body;
+    const { nama, email, password, role, bidang_id, jabatan, sub_bidang } = req.body;
 
     if (!nama || !email || !role) {
       return res.status(400).json({ success: false, message: 'Nama, email, dan role wajib diisi.' });
     }
 
+    const validRoles = ['SUPER_ADMIN', 'MUDIR', 'WAKIL_MUDIR', 'WADIR_PEND', 'WADIR_PENGS', 'KABID', 'STAF'];
+    if (!validRoles.includes(role)) return res.status(400).json({ success: false, message: 'Role tidak valid.' });
     const db = getPool();
     const [existing] = await db.query('SELECT id FROM users WHERE email = ? AND id != ?', [
       email.trim().toLowerCase(),
@@ -144,13 +158,13 @@ async function updateUser(req, res) {
       const salt = await bcrypt.genSalt(10);
       const hashedPassword = await bcrypt.hash(password, salt);
       await db.query(
-        `UPDATE users SET nama = ?, email = ?, password = ?, role = ?, bidang_id = ?, jabatan = ? WHERE id = ?`,
-        [nama.trim(), email.trim().toLowerCase(), hashedPassword, role, bidang_id || null, jabatan || null, id]
+        `UPDATE users SET nama = ?, email = ?, password = ?, role = ?, bidang_id = ?, jabatan = ?, sub_bidang = ? WHERE id = ?`,
+        [nama.trim(), email.trim().toLowerCase(), hashedPassword, role, bidang_id || null, jabatan || null, sub_bidang || null, id]
       );
     } else {
       await db.query(
-        `UPDATE users SET nama = ?, email = ?, role = ?, bidang_id = ?, jabatan = ? WHERE id = ?`,
-        [nama.trim(), email.trim().toLowerCase(), role, bidang_id || null, jabatan || null, id]
+        `UPDATE users SET nama = ?, email = ?, role = ?, bidang_id = ?, jabatan = ?, sub_bidang = ? WHERE id = ?`,
+        [nama.trim(), email.trim().toLowerCase(), role, bidang_id || null, jabatan || null, sub_bidang || null, id]
       );
     }
 

@@ -21,6 +21,12 @@ async function getDashboardStats(req, res) {
     } else if (role === 'KABID') {
       whereClause += ' AND (bidang_id = ? OR created_by = ? OR assigned_to = ?)';
       params.push(bidang_id, userId, userId);
+    } else if (role === 'WADIR_PEND' || role === 'WADIR_PENGS') {
+      whereClause += ' AND (EXISTS (SELECT 1 FROM bidang bx WHERE bx.id = bidang_id AND bx.parent_role = ?) OR created_by = ? OR assigned_to = ?)';
+      params.push(role, userId, userId);
+    } else if (role === 'WAKIL_MUDIR') {
+      whereClause += ' AND (created_by = ? OR assigned_to = ?)';
+      params.push(userId, userId);
     }
 
     if (filterBidangId) {
@@ -56,6 +62,12 @@ async function getDashboardStats(req, res) {
     } else if (role === 'KABID') {
       periodWhere += ' AND (bidang_id = ? OR created_by = ? OR assigned_to = ?)';
       periodParams.push(bidang_id, userId, userId);
+    } else if (role === 'WADIR_PEND' || role === 'WADIR_PENGS') {
+      periodWhere += ' AND (EXISTS (SELECT 1 FROM bidang bx WHERE bx.id = bidang_id AND bx.parent_role = ?) OR created_by = ? OR assigned_to = ?)';
+      periodParams.push(role, userId, userId);
+    } else if (role === 'WAKIL_MUDIR') {
+      periodWhere += ' AND (created_by = ? OR assigned_to = ?)';
+      periodParams.push(userId, userId);
     }
     if (filterBidangId) {
       periodWhere += ' AND bidang_id = ?';
@@ -75,18 +87,22 @@ async function getDashboardStats(req, res) {
 
     // Department completion summary (for leadership / Mudir / Wakil Mudir / Super Admin)
     let departmentSummary = [];
-    if (['SUPER_ADMIN', 'MUDIR', 'WAKIL_MUDIR'].includes(role)) {
+    if (['SUPER_ADMIN', 'MUDIR', 'WAKIL_MUDIR', 'WADIR_PEND', 'WADIR_PENGS'].includes(role)) {
       const [deptRows] = await db.query(`
         SELECT
           b.id, b.nama_bidang, b.kode_bidang,
           COUNT(t.id) AS total_tasks,
           SUM(CASE WHEN t.status = 'COMPLETED' THEN 1 ELSE 0 END) AS completed_tasks,
+          SUM(CASE WHEN t.status IN ('TO_DO', 'REVISION', 'UNDER_REVIEW') THEN 1 ELSE 0 END) AS pending_tasks,
+          SUM(CASE WHEN t.status = 'IN_PROGRESS' THEN 1 ELSE 0 END) AS in_progress_tasks,
+          SUM(CASE WHEN t.status = 'UNDER_REVIEW' THEN 1 ELSE 0 END) AS under_review_tasks,
           SUM(CASE WHEN t.status != 'COMPLETED' AND t.due_date < NOW() THEN 1 ELSE 0 END) AS overdue_tasks
         FROM bidang b
         LEFT JOIN tasks t ON b.id = t.bidang_id
+        WHERE (? IS NULL OR b.parent_role = ?)
         GROUP BY b.id
         ORDER BY b.nama_bidang ASC
-      `);
+      `, [role === 'WADIR_PEND' || role === 'WADIR_PENGS' ? role : null, role]);
       departmentSummary = deptRows;
     }
 
@@ -112,6 +128,7 @@ async function exportExcelReport(req, res) {
       SELECT t.*,
              creator.nama AS creator_nama,
              assignee.nama AS assignee_nama, assignee.email AS assignee_email,
+             assignee.jabatan AS assignee_jabatan, assignee.sub_bidang AS assignee_sub_bidang,
              b.nama_bidang, b.kode_bidang
       FROM tasks t
       JOIN users creator ON t.created_by = creator.id
@@ -127,6 +144,12 @@ async function exportExcelReport(req, res) {
     } else if (role === 'KABID') {
       query += ' AND (t.bidang_id = ? OR t.created_by = ? OR t.assigned_to = ?)';
       params.push(bidang_id, userId, userId);
+    } else if (role === 'WADIR_PEND' || role === 'WADIR_PENGS') {
+      query += ' AND (b.parent_role = ? OR t.created_by = ? OR t.assigned_to = ?)';
+      params.push(role, userId, userId);
+    } else if (role === 'WAKIL_MUDIR') {
+      query += ' AND (t.created_by = ? OR t.assigned_to = ?)';
+      params.push(userId, userId);
     }
 
     if (periode) {
@@ -158,6 +181,7 @@ async function exportExcelReport(req, res) {
       { header: 'Prioritas', key: 'prioritas', width: 14 },
       { header: 'Status', key: 'status', width: 16 },
       { header: 'Penerima Tugas (Assignee)', key: 'assignee', width: 25 },
+      { header: 'Jabatan / Sub-Bidang', key: 'assignee_position', width: 32 },
       { header: 'Pemberi Tugas', key: 'creator', width: 22 },
       { header: 'Bidang / Divisi', key: 'bidang', width: 25 },
       { header: 'Tenggat Waktu (Due Date)', key: 'due_date', width: 22 },
@@ -183,6 +207,7 @@ async function exportExcelReport(req, res) {
         prioritas: row.prioritas,
         status: row.status,
         assignee: `${row.assignee_nama} (${row.assignee_email})`,
+        assignee_position: [row.assignee_jabatan, row.assignee_sub_bidang].filter(Boolean).join(' / ') || '-',
         creator: row.creator_nama,
         bidang: row.nama_bidang,
         due_date: new Date(row.due_date).toLocaleString('id-ID'),

@@ -79,7 +79,7 @@ export default function TaskTable({
                 const statusBadge = getStatusBadge(task.status);
                 const isOverdue = task.status !== 'COMPLETED' && new Date(task.due_date) < new Date();
                 const isAssignee = task.assigned_to === user?.id;
-                const canReview = ['SUPER_ADMIN', 'MUDIR', 'WAKIL_MUDIR'].includes(role) ||
+                const canReview = ['SUPER_ADMIN', 'MUDIR', 'WAKIL_MUDIR', 'WADIR_PEND', 'WADIR_PENGS'].includes(role) ||
                                   task.created_by === user?.id ||
                                   (role === 'KABID' && task.bidang_id === user?.bidang_id);
                 const canEdit = ['SUPER_ADMIN', 'MUDIR'].includes(role) || task.created_by === user?.id;
@@ -130,7 +130,7 @@ export default function TaskTable({
                     {/* Assignee & Bidang */}
                     <td className="py-3.5 px-3 whitespace-nowrap">
                       <div className="font-semibold text-slate-800">{task.assignee_nama}</div>
-                      <div className="text-[10px] text-slate-500">{task.nama_bidang}</div>
+                      <div className="text-[10px] text-slate-500">{task.nama_bidang}{task.assignee_sub_bidang ? ` · ${task.assignee_sub_bidang}` : ''}</div>
                     </td>
 
                     {/* Due Date */}
