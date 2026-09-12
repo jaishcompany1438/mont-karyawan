@@ -20,7 +20,9 @@ export default function TaskTable({
   onOpenReview,
   onOpenEditTask,
   onDeleteTask,
-  onStartTask
+  onStartTask,
+  selectedIds = [],
+  onSelectionChange
 }) {
   const { user } = useAuth();
   const role = user?.role;
@@ -58,7 +60,7 @@ export default function TaskTable({
         <table className="w-full text-left border-collapse">
           <thead>
             <tr className="bg-slate-50 border-b border-slate-200 text-[11px] font-bold text-slate-600 uppercase tracking-wider">
-              <th className="py-3.5 px-4">Tugas</th>
+              <th className="py-3.5 px-2">{role === 'SUPER_ADMIN' && <input type="checkbox" checked={tasks.length > 0 && selectedIds.length === tasks.length} onChange={(e) => onSelectionChange(e.target.checked ? tasks.map((task) => task.id) : [])} />}</th><th className="py-3.5 px-4">Tugas</th>
               <th className="py-3.5 px-3">Periode</th>
               <th className="py-3.5 px-3">Prioritas</th>
               <th className="py-3.5 px-3">Penerima & Bidang</th>
@@ -70,7 +72,7 @@ export default function TaskTable({
           <tbody className="divide-y divide-slate-100 text-xs text-slate-700">
             {tasks.length === 0 ? (
               <tr>
-                <td colSpan="7" className="py-10 text-center text-slate-400 font-medium">
+                <td colSpan="8" className="py-10 text-center text-slate-400 font-medium">
                   Tidak ada tugas yang sesuai dengan kriteria filter.
                 </td>
               </tr>
@@ -86,9 +88,11 @@ export default function TaskTable({
 
                 return (
                   <tr key={task.id} className="hover:bg-slate-50/70 transition-colors">
+                    <td className="py-3.5 px-2">{role === 'SUPER_ADMIN' && <input type="checkbox" checked={selectedIds.includes(task.id)} onChange={(e) => onSelectionChange(e.target.checked ? [...selectedIds, task.id] : selectedIds.filter((id) => id !== task.id))} />}</td>
                     {/* Title & Description */}
                     <td className="py-3.5 px-4 max-w-[260px]">
                       <div className="font-bold text-slate-900 line-clamp-1">{task.judul}</div>
+                      <div className="text-[10px] text-slate-500">Anggaran: Rp {Number(task.anggaran_dana || 0).toLocaleString('id-ID')} · Terpakai: Rp {Number(task.anggaran_terpakai || 0).toLocaleString('id-ID')}</div>
                       {task.deskripsi && (
                         <div className="text-[11px] text-slate-500 line-clamp-1 mt-0.5">
                           {task.deskripsi}
@@ -131,6 +135,7 @@ export default function TaskTable({
                     <td className="py-3.5 px-3 whitespace-nowrap">
                       <div className="font-semibold text-slate-800">{task.assignee_nama}</div>
                       <div className="text-[10px] text-slate-500">{task.nama_bidang}{task.assignee_sub_bidang ? ` · ${task.assignee_sub_bidang}` : ''}</div>
+                      {task.assignee_no_telepon && <a className="text-[10px] font-semibold text-emerald-700 hover:underline" href={`https://wa.me/${String(task.assignee_no_telepon).replace(/\D/g, '').replace(/^0/, '62')}`} target="_blank" rel="noreferrer">WhatsApp</a>}
                     </td>
 
                     {/* Due Date */}

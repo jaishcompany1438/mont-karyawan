@@ -11,6 +11,7 @@ const initialForm = {
   bidang_id: '',
   jabatan: '',
   sub_bidang: ''
+  ,no_telepon: ''
 };
 
 export default function Users({ refreshKey, onRefresh }) {
@@ -68,7 +69,7 @@ export default function Users({ refreshKey, onRefresh }) {
 
   const editUser = (item) => {
     setEditingId(item.id);
-    setForm({ nama: item.nama, email: item.email, password: '', role: item.role, bidang_id: item.bidang_id || '', jabatan: item.jabatan || '', sub_bidang: item.sub_bidang || '' });
+    setForm({ nama: item.nama, email: item.email, password: '', role: item.role, bidang_id: item.bidang_id || '', jabatan: item.jabatan || '', sub_bidang: item.sub_bidang || '', no_telepon: item.no_telepon || '' });
     setShowForm(true);
     setError('');
     setSuccess('');
@@ -155,6 +156,10 @@ export default function Users({ refreshKey, onRefresh }) {
               Sub-Bidang / Unit
               <input placeholder="Contoh: Masjid, Asrama, Publikasi" value={form.sub_bidang} onChange={(e) => updateField('sub_bidang', e.target.value)} className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 text-sm font-normal outline-none focus:ring-2 focus:ring-emerald-500" />
             </label>
+            <label className="text-xs font-bold text-slate-700">
+              Nomor WhatsApp
+              <input placeholder="Contoh: 628123456789" value={form.no_telepon} onChange={(e) => updateField('no_telepon', e.target.value)} className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 text-sm font-normal" />
+            </label>
           </div>
           <div className="mt-4 flex justify-end gap-2">
             <button type="button" onClick={() => { setShowForm(false); setEditingId(null); setForm(initialForm); }} className="rounded-xl px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100"><X className="mr-1 inline h-3.5 w-3.5" />Batal</button>
@@ -166,10 +171,10 @@ export default function Users({ refreshKey, onRefresh }) {
       <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-sm">
         <table className="w-full text-left text-xs">
           <thead className="bg-slate-50 font-bold text-slate-600">
-            <tr><th className="p-3">Nama</th><th className="p-3">Email</th><th className="p-3">Role</th><th className="p-3">Bidang / Unit</th><th className="p-3">Jabatan</th>{isSuperAdmin && <th className="p-3">Aksi</th>}</tr>
+            <tr><th className="p-3">Nama</th><th className="p-3">Email</th><th className="p-3">WhatsApp</th><th className="p-3">Role</th><th className="p-3">Bidang / Unit</th><th className="p-3">Jabatan</th>{isSuperAdmin && <th className="p-3">Aksi</th>}</tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
-            {users.map((item) => <tr key={item.id}><td className="p-3 font-semibold text-slate-800">{item.nama}</td><td className="p-3">{item.email}</td><td className="p-3">{item.role}</td><td className="p-3">{item.nama_bidang || '-'}{item.sub_bidang && <span className="block text-[10px] text-emerald-700">{item.sub_bidang}</span>}</td><td className="p-3">{item.jabatan || '-'}</td>{isSuperAdmin && <td className="p-3"><div className="flex gap-1"><button onClick={() => editUser(item)} className="rounded-lg p-1.5 text-blue-600 hover:bg-blue-50"><Edit2 className="h-3.5 w-3.5" /></button><button onClick={() => removeUser(item.id)} className="rounded-lg p-1.5 text-rose-600 hover:bg-rose-50"><Trash2 className="h-3.5 w-3.5" /></button></div></td>}</tr>)}
+            {users.map((item) => <tr key={item.id}><td className="p-3 font-semibold text-slate-800">{item.nama}</td><td className="p-3">{item.email}</td><td className="p-3">{item.no_telepon || '-'}</td><td className="p-3">{item.role}</td><td className="p-3">{item.nama_bidang || '-'}{item.sub_bidang && <span className="block text-[10px] text-emerald-700">{item.sub_bidang}</span>}</td><td className="p-3">{item.jabatan || '-'}</td>{isSuperAdmin && <td className="p-3"><div className="flex gap-1"><button onClick={() => editUser(item)} className="rounded-lg p-1.5 text-blue-600 hover:bg-blue-50"><Edit2 className="h-3.5 w-3.5" /></button><button onClick={() => removeUser(item.id)} className="rounded-lg p-1.5 text-rose-600 hover:bg-rose-50"><Trash2 className="h-3.5 w-3.5" /></button></div></td>}</tr>)}
             {!users.length && <tr><td colSpan={isSuperAdmin ? 6 : 5} className="p-8 text-center text-slate-400">Belum ada data pengguna.</td></tr>}
           </tbody>
         </table>

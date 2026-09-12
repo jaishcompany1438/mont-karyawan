@@ -61,6 +61,7 @@ async function initDB() {
         bidang_id INT NULL,
         jabatan VARCHAR(100) NULL,
         sub_bidang VARCHAR(100) NULL,
+        no_telepon VARCHAR(30) NULL,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (bidang_id) REFERENCES bidang(id) ON DELETE SET NULL
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
@@ -81,6 +82,8 @@ async function initDB() {
         assigned_to INT NOT NULL,
         bidang_id INT NOT NULL,
         due_date DATETIME NOT NULL,
+        anggaran_dana DECIMAL(15,2) NOT NULL DEFAULT 0,
+        anggaran_terpakai DECIMAL(15,2) NOT NULL DEFAULT 0,
         is_recurring TINYINT(1) NOT NULL DEFAULT 0,
         recurrence_parent_id INT NULL,
         recurrence_generated_at DATETIME NULL,
@@ -103,6 +106,9 @@ async function initDB() {
       ['tasks', 'is_recurring', 'ALTER TABLE tasks ADD COLUMN is_recurring TINYINT(1) NOT NULL DEFAULT 0 AFTER due_date'],
       ['tasks', 'recurrence_parent_id', 'ALTER TABLE tasks ADD COLUMN recurrence_parent_id INT NULL AFTER is_recurring'],
       ['tasks', 'recurrence_generated_at', 'ALTER TABLE tasks ADD COLUMN recurrence_generated_at DATETIME NULL AFTER recurrence_parent_id']
+      ,['users', 'no_telepon', 'ALTER TABLE users ADD COLUMN no_telepon VARCHAR(30) NULL AFTER sub_bidang']
+      ,['tasks', 'anggaran_dana', 'ALTER TABLE tasks ADD COLUMN anggaran_dana DECIMAL(15,2) NOT NULL DEFAULT 0 AFTER due_date']
+      ,['tasks', 'anggaran_terpakai', 'ALTER TABLE tasks ADD COLUMN anggaran_terpakai DECIMAL(15,2) NOT NULL DEFAULT 0 AFTER anggaran_dana']
     ];
     for (const [table, column, statement] of migrations) {
       const [columns] = await db.query(
@@ -156,12 +162,13 @@ async function generateDueRecurringTasks() {
         const [result] = await connection.query(`
           INSERT INTO tasks (
             judul, deskripsi, periode, kategori, prioritas, status,
-            created_by, assigned_to, bidang_id, due_date, file_attachment,
+            created_by, assigned_to, bidang_id, due_date, anggaran_dana, anggaran_terpakai, file_attachment,
             is_recurring, recurrence_parent_id
-          ) VALUES (?, ?, ?, ?, ?, 'TO_DO', ?, ?, ?, ?, ?, 1, ?)
+          ) VALUES (?, ?, ?, ?, ?, 'TO_DO', ?, ?, ?, ?, ?, 0, ?, 1, ?)
         `, [
           task.judul, task.deskripsi, task.periode, task.kategori, task.prioritas,
           task.created_by, task.assigned_to, task.bidang_id, nextDue,
+          task.anggaran_dana,
           task.file_attachment, task.recurrence_parent_id || task.id
         ]);
         await connection.query(

@@ -117,17 +117,15 @@ async function getDashboardStats(req, res) {
   }
 }
 
-// GET /api/reports/export/excel
-async function exportExcelReport(req, res) {
-  try {
+async function getReportRows(req) {
     const { role, bidang_id, id: userId } = req.user;
-    const { periode, status, bidang_id: filterBidangId } = req.query;
+    const { periode, status, bidang_id: filterBidangId, start_date: startDate, end_date: endDate } = req.query;
     const db = getPool();
 
     let query = `
       SELECT t.*,
              creator.nama AS creator_nama,
-             assignee.nama AS assignee_nama, assignee.email AS assignee_email,
+             assignee.nama AS assignee_nama, assignee.email AS assignee_email, assignee.no_telepon AS assignee_no_telepon,
              assignee.jabatan AS assignee_jabatan, assignee.sub_bidang AS assignee_sub_bidang,
              b.nama_bidang, b.kode_bidang
       FROM tasks t
@@ -164,11 +162,25 @@ async function exportExcelReport(req, res) {
       query += ' AND t.bidang_id = ?';
       params.push(filterBidangId);
     }
+    if (startDate) {
+      query += ' AND t.due_date >= ?';
+      params.push(`${startDate} 00:00:00`);
+    }
+    if (endDate) {
+      query += ' AND t.due_date <= ?';
+      params.push(`${endDate} 23:59:59`);
+    }
 
     query += ' ORDER BY t.periode ASC, t.due_date ASC';
 
     const [rows] = await db.query(query, params);
+    return rows;
+}
 
+// GET /api/reports/export/excel
+async function exportExcelReport(req, res) {
+  try {
+    const rows = await getReportRows(req);
     const workbook = new ExcelJS.Workbook();
     workbook.creator = 'PTQ Imam Ath Thobari Monitoring System';
     const worksheet = workbook.addWorksheet('Rekap Kinerja Tugas');
@@ -184,6 +196,9 @@ async function exportExcelReport(req, res) {
       { header: 'Jabatan / Sub-Bidang', key: 'assignee_position', width: 32 },
       { header: 'Pemberi Tugas', key: 'creator', width: 22 },
       { header: 'Bidang / Divisi', key: 'bidang', width: 25 },
+      { header: 'Anggaran Dana', key: 'anggaran_dana', width: 18 },
+      { header: 'Anggaran Terpakai', key: 'anggaran_terpakai', width: 20 },
+      { header: 'Sisa Saldo', key: 'sisa_saldo', width: 18 },
       { header: 'Tenggat Waktu (Due Date)', key: 'due_date', width: 22 },
       { header: 'Catatan Revisi', key: 'catatan_revisi', width: 30 }
     ];
@@ -210,6 +225,9 @@ async function exportExcelReport(req, res) {
         assignee_position: [row.assignee_jabatan, row.assignee_sub_bidang].filter(Boolean).join(' / ') || '-',
         creator: row.creator_nama,
         bidang: row.nama_bidang,
+        anggaran_dana: Number(row.anggaran_dana || 0),
+        anggaran_terpakai: Number(row.anggaran_terpakai || 0),
+        sisa_saldo: Number(row.anggaran_dana || 0) - Number(row.anggaran_terpakai || 0),
         due_date: new Date(row.due_date).toLocaleString('id-ID'),
         catatan_revisi: row.catatan_revisi || '-'
       });
@@ -225,7 +243,78 @@ async function exportExcelReport(req, res) {
   }
 }
 
+function pdfEscape(value) {
+  return String(value || '-').replace(/\\/g, '\\\\').replace(/\(/g, '\\(').replace(/\)/g, '\\)');
+}
+
+function createReportPdf(rows, filters) {
+  const pageWidth = 842;
+  const pageHeight = 595;
+  const margin = 32;
+  const totalRemaining = rows.reduce((sum, row) => sum + Number(row.anggaran_dana || 0) - Number(row.anggaran_terpakai || 0), 0);
+  const lines = [
+    'LAPORAN REKAP KINERJA TUGAS',
+    'PTQ Imam Ath Thobari',
+    `Periode: ${filters.start_date || '-'} s/d ${filters.end_date || '-'}`,
+    'Deskripsi                         Status             Anggaran Terpakai       Sisa Saldo',
+    ''
+  ];
+  rows.forEach((row, index) => {
+    lines.push(`${index + 1}. ${(row.deskripsi || row.judul).slice(0, 32)} | ${row.status} | Rp ${Number(row.anggaran_terpakai || 0).toLocaleString('id-ID')} | Rp ${(Number(row.anggaran_dana || 0) - Number(row.anggaran_terpakai || 0)).toLocaleString('id-ID')}`);
+    lines.push(`   Program: ${row.judul.slice(0, 70)} | Penerima: ${row.assignee_nama}`);
+    lines.push('');
+  });
+  lines.push(`TOTAL SISA SALDO: Rp ${totalRemaining.toLocaleString('id-ID')}`);
+
+  const content = [];
+  let y = pageHeight - margin;
+  lines.forEach((line, index) => {
+    if (y < margin) return;
+    const fontSize = index < 2 ? 16 : 9;
+    const font = index < 2 ? '/F2' : '/F1';
+    if (index >= 5 && line) {
+      content.push(`q 0.96 0.98 0.97 rg ${margin - 5} ${y - 4} 778 15 re f Q`);
+    }
+    content.push(`BT ${font} ${fontSize} Tf ${margin} ${y} Td (${pdfEscape(line.slice(0, 125))}) Tj ET`);
+    y -= index < 2 ? 22 : 13;
+  });
+
+  const objects = [
+    '<< /Type /Catalog /Pages 2 0 R >>',
+    '<< /Type /Pages /Kids [3 0 R] /Count 1 >>',
+    `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${pageWidth} ${pageHeight}] /Resources << /Font << /F1 4 0 R /F2 5 0 R >> >> /Contents 6 0 R >>`,
+    '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>',
+    '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>',
+    `<< /Length ${content.join('\n').length} >>\nstream\n${content.join('\n')}\nendstream`
+  ];
+  let pdf = '%PDF-1.4\n';
+  const offsets = [0];
+  objects.forEach((object, index) => {
+    offsets[index + 1] = Buffer.byteLength(pdf, 'utf8');
+    pdf += `${index + 1} 0 obj\n${object}\nendobj\n`;
+  });
+  const xref = Buffer.byteLength(pdf, 'utf8');
+  pdf += `xref\n0 ${objects.length + 1}\n0000000000 65535 f \n`;
+  offsets.slice(1).forEach((offset) => { pdf += `${String(offset).padStart(10, '0')} 00000 n \n`; });
+  pdf += `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF`;
+  return Buffer.from(pdf, 'utf8');
+}
+
+async function exportPdfReport(req, res) {
+  try {
+    const rows = await getReportRows(req);
+    const pdf = createReportPdf(rows, req.query);
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="rekap_kinerja_${Date.now()}.pdf"`);
+    return res.send(pdf);
+  } catch (error) {
+    console.error('Export PDF report error:', error);
+    return res.status(500).json({ success: false, message: 'Gagal mengekspor PDF: ' + error.message });
+  }
+}
+
 module.exports = {
   getDashboardStats,
-  exportExcelReport
+  exportExcelReport,
+  exportPdfReport
 };

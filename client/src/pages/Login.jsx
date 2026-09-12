@@ -25,7 +25,13 @@ export default function Login() {
   return (
     <main className="min-h-screen bg-slate-900 grid place-items-center p-4">
       <form onSubmit={submit} className="w-full max-w-md rounded-3xl bg-white p-8 shadow-2xl">
-        <div className="mx-auto mb-5 grid h-14 w-14 place-items-center rounded-2xl bg-emerald-700 text-xl font-extrabold text-white">PTQ</div>
+        <div className="mx-auto mb-5 grid h-14 w-14 place-items-center rounded-2xl bg-emerald-700 text-xl font-extrabold text-white">
+          <img
+            src="/logo.svg"
+            alt="Logo PTQ Imam Ath Thobari"
+            className="h-full w-full object-contain"
+          />
+        </div>
         <h1 className="text-center text-xl font-extrabold text-slate-900">Monitoring Karyawan</h1>
         <p className="mt-1 text-center text-xs text-slate-500">PTQ Imam Ath Thobari</p>
         {error && <div className="mt-5 rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs text-rose-700">{error}</div>}
