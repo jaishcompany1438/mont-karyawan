@@ -136,6 +136,10 @@ export default function KanbanBoard({
                           {task.kode_bidang}
                         </span>
                       </div>
+                      <div className="mb-2 text-[10px] text-slate-500">
+                        Anggaran: Rp {Number(task.anggaran_dana || 0).toLocaleString('id-ID')} · Sisa: Rp {(Number(task.anggaran_dana || 0) - Number(task.anggaran_terpakai || 0)).toLocaleString('id-ID')}
+                        {task.assignee_no_telepon && <a className="ml-2 font-semibold text-emerald-700 hover:underline" href={`https://wa.me/${String(task.assignee_no_telepon).replace(/\D/g, '').replace(/^0/, '62')}`} target="_blank" rel="noreferrer">WhatsApp</a>}
+                      </div>
 
                       {/* Due Date & Proof Indicators */}
                       <div className="flex items-center justify-between text-[10px]">

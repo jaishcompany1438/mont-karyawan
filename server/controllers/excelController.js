@@ -19,6 +19,8 @@ async function downloadTemplate(req, res) {
         { header: 'Email Assignee', key: 'email_assignee', width: 30 },
         { header: 'Prioritas (RENDAH/SEDANG/TINGGI/URGEN)', key: 'prioritas', width: 35 },
         { header: 'Due Date (YYYY-MM-DD HH:mm)', key: 'due_date', width: 30 },
+        { header: 'Anggaran Dana (wajib, boleh 0)', key: 'anggaran_dana', width: 28 },
+        { header: 'Anggaran Terpakai (boleh 0)', key: 'anggaran_terpakai', width: 28 },
         { header: 'Berulang? (YA/TIDAK, default YA untuk H/P/B)', key: 'is_recurring', width: 38 }
       ];
 
@@ -41,6 +43,8 @@ async function downloadTemplate(req, res) {
         email_assignee: 'staf.it@thobari.sch.id',
         prioritas: 'TINGGI',
         due_date: '2026-09-15 16:00',
+        anggaran_dana: 0,
+        anggaran_terpakai: 0,
         is_recurring: 'YA'
       });
 
@@ -178,7 +182,9 @@ async function importTasks(req, res) {
         const emailAssignee = row.getCell(4).text?.trim().toLowerCase();
         const prioritasRaw = row.getCell(5).text?.trim().toUpperCase();
         const dueDateRaw = row.getCell(6).text?.trim();
-        const recurringRaw = row.getCell(7).text?.trim().toUpperCase();
+        const budgetRaw = row.getCell(7).text?.trim();
+        const spentRaw = row.getCell(8).text?.trim();
+        const recurringRaw = row.getCell(9).text?.trim().toUpperCase();
 
         if (judul && emailAssignee) {
           rows.push({
@@ -189,6 +195,8 @@ async function importTasks(req, res) {
             emailAssignee,
             prioritasRaw,
             dueDateRaw,
+            budgetRaw,
+            spentRaw,
             recurringRaw
           });
         }
@@ -249,6 +257,12 @@ async function importTasks(req, res) {
         }
 
         const targetBidangId = assignee.bidang_id || creatorBidangId || 1;
+        const budget = Number(item.budgetRaw);
+        const spent = Number(item.spentRaw || 0);
+        if (item.budgetRaw === '' || !Number.isFinite(budget) || budget < 0 || !Number.isFinite(spent) || spent < 0 || spent > budget) {
+          errors.push(`Baris ${item.rowNumber}: Anggaran dana wajib berupa angka >= 0 dan anggaran terpakai tidak boleh melebihinya.`);
+          continue;
+        }
         if ((role === 'WADIR_PEND' || role === 'WADIR_PENGS') && assignee.parent_role !== role) {
           errors.push(`Baris ${item.rowNumber}: Bidang tugas harus berada di cabang Wadir.`);
           continue;
@@ -257,12 +271,22 @@ async function importTasks(req, res) {
           ? ['YA', 'Y', 'YES', '1', 'TRUE'].includes(item.recurringRaw) ? 1 : 0
           : ['HARIAN', 'PEKANAN', 'BULANAN'].includes(periode) ? 1 : 0;
 
-        await db.query(
-          `INSERT INTO tasks (
+        const [existingTasks] = await db.query(
+          'SELECT id FROM tasks WHERE judul = ? AND assigned_to = ? AND due_date = ? LIMIT 1',
+          [item.judul, assignee.id, dueDate]
+        );
+        if (existingTasks.length > 0) {
+          await db.query(
+            `UPDATE tasks SET deskripsi = ?, periode = ?, prioritas = ?, bidang_id = ?, anggaran_dana = ?, anggaran_terpakai = ?, is_recurring = ? WHERE id = ?`,
+            [item.deskripsi || null, periode, prioritas, targetBidangId, budget, spent, isRecurring, existingTasks[0].id]
+          );
+        } else {
+          await db.query(
+            `INSERT INTO tasks (
             judul, deskripsi, periode, kategori, prioritas, status,
-            created_by, assigned_to, bidang_id, due_date, is_recurring
-          ) VALUES (?, ?, ?, 'RUTIN', ?, 'TO_DO', ?, ?, ?, ?, ?)`,
-          [
+            created_by, assigned_to, bidang_id, due_date, anggaran_dana, anggaran_terpakai, is_recurring
+          ) VALUES (?, ?, ?, 'RUTIN', ?, 'TO_DO', ?, ?, ?, ?, ?, ?, ?)`,
+            [
             item.judul,
             item.deskripsi || null,
             periode,
@@ -271,9 +295,12 @@ async function importTasks(req, res) {
             assignee.id,
             targetBidangId,
             dueDate,
+            budget,
+            spent,
             isRecurring
-          ]
-        );
+            ]
+          );
+        }
 
         importedCount++;
       } catch (err) {

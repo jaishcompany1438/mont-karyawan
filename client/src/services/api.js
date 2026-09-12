@@ -121,6 +121,15 @@ export const api = {
     return handleResponse(res);
   },
 
+  async deleteTasks(ids) {
+    const res = await fetch(`${BASE_URL}/tasks`, {
+      method: 'DELETE',
+      headers: getHeaders(),
+      body: JSON.stringify({ ids })
+    });
+    return handleResponse(res);
+  },
+
   // Users
   async getUsers(params = {}) {
     const query = new URLSearchParams(params);

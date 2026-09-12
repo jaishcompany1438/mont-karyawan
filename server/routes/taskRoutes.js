@@ -8,7 +8,8 @@ const {
   updateTaskStatus,
   submitReview,
   reviewTask,
-  deleteTask
+  deleteTask,
+  deleteTasks
 } = require('../controllers/taskController');
 const { authenticateToken } = require('../middleware/auth');
 const upload = require('../middleware/upload');
@@ -23,5 +24,6 @@ router.patch('/:id/status', updateTaskStatus);
 router.post('/:id/submit-review', upload.single('bukti_kerja'), submitReview);
 router.post('/:id/review', reviewTask);
 router.delete('/:id', deleteTask);
+router.delete('/', deleteTasks);
 
 module.exports = router;

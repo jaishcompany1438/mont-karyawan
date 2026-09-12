@@ -19,7 +19,7 @@ async function getTasks(req, res) {
     let query = `
       SELECT t.*,
              creator.nama AS creator_nama, creator.role AS creator_role,
-             assignee.nama AS assignee_nama, assignee.email AS assignee_email, assignee.jabatan AS assignee_jabatan,
+             assignee.nama AS assignee_nama, assignee.email AS assignee_email, assignee.no_telepon AS assignee_no_telepon, assignee.jabatan AS assignee_jabatan,
              assignee.sub_bidang AS assignee_sub_bidang,
              b.nama_bidang, b.kode_bidang, b.parent_role
       FROM tasks t
@@ -108,7 +108,7 @@ async function getTaskById(req, res) {
     const [rows] = await db.query(
       `SELECT t.*,
               creator.nama AS creator_nama, creator.role AS creator_role,
-              assignee.nama AS assignee_nama, assignee.email AS assignee_email, assignee.jabatan AS assignee_jabatan,
+              assignee.nama AS assignee_nama, assignee.email AS assignee_email, assignee.no_telepon AS assignee_no_telepon, assignee.jabatan AS assignee_jabatan,
               assignee.sub_bidang AS assignee_sub_bidang,
               b.nama_bidang, b.kode_bidang, b.parent_role
        FROM tasks t
@@ -165,15 +165,17 @@ async function createTask(req, res) {
       assigned_to,
       bidang_id,
       due_date,
-      is_recurring
+      is_recurring,
+      anggaran_dana
     } = req.body;
-
-    if (!judul || !assigned_to || !due_date) {
+    if (!judul || !assigned_to || !due_date || anggaran_dana === undefined || anggaran_dana === null || anggaran_dana === '') {
       return res.status(400).json({
         success: false,
-        message: 'Judul tugas, penerima tugas (assignee), dan tanggal tenggat (due date) wajib diisi.'
+        message: 'Judul, penerima, tenggat, dan anggaran dana wajib diisi.'
       });
     }
+    const budget = Number(anggaran_dana);
+    if (!Number.isFinite(budget) || budget < 0) return res.status(400).json({ success: false, message: 'Anggaran dana harus berupa angka nol atau lebih.' });
 
     const db = getPool();
 
@@ -220,8 +222,8 @@ async function createTask(req, res) {
     const [result] = await db.query(
       `INSERT INTO tasks (
         judul, deskripsi, periode, kategori, prioritas, status,
-        created_by, assigned_to, bidang_id, due_date, file_attachment, is_recurring
-      ) VALUES (?, ?, ?, ?, ?, 'TO_DO', ?, ?, ?, ?, ?, ?)`,
+        created_by, assigned_to, bidang_id, due_date, anggaran_dana, anggaran_terpakai, file_attachment, is_recurring
+      ) VALUES (?, ?, ?, ?, ?, 'TO_DO', ?, ?, ?, ?, ?, 0, ?, ?)`,
       [
         judul.trim(),
         deskripsi || null,
@@ -232,6 +234,7 @@ async function createTask(req, res) {
         assignee.id,
         targetBidangId,
         new Date(due_date),
+        budget,
         file_attachment,
         recurringFlag(
           is_recurring,
@@ -286,7 +289,12 @@ async function updateTask(req, res) {
       bidang_id,
       due_date,
       is_recurring
+      ,anggaran_dana
     } = req.body;
+    const nextBudget = Number(anggaran_dana !== undefined ? anggaran_dana : task.anggaran_dana);
+    if (!Number.isFinite(nextBudget) || nextBudget < 0 || nextBudget < Number(task.anggaran_terpakai || 0)) {
+      return res.status(400).json({ success: false, message: 'Anggaran dana tidak valid atau lebih kecil dari anggaran terpakai.' });
+    }
     if (role === 'WADIR_PEND' || role === 'WADIR_PENGS') {
       const [candidate] = await db.query(
         `SELECT u.role, b.parent_role FROM users u LEFT JOIN bidang b ON u.bidang_id = b.id WHERE u.id = ?`,
@@ -302,7 +310,7 @@ async function updateTask(req, res) {
     await db.query(
       `UPDATE tasks SET
         judul = ?, deskripsi = ?, periode = ?, kategori = ?, prioritas = ?,
-        status = ?, assigned_to = ?, bidang_id = ?, due_date = ?, file_attachment = ?,
+        status = ?, assigned_to = ?, bidang_id = ?, due_date = ?, anggaran_dana = ?, file_attachment = ?,
         is_recurring = ?, recurrence_generated_at = NULL
        WHERE id = ?`,
       [
@@ -315,6 +323,7 @@ async function updateTask(req, res) {
         assigned_to || task.assigned_to,
         bidang_id || task.bidang_id,
         due_date ? new Date(due_date) : task.due_date,
+        nextBudget,
         file_attachment,
         recurringFlag(is_recurring, task.is_recurring),
         id
@@ -363,7 +372,7 @@ async function submitReview(req, res) {
   try {
     const { id } = req.params;
     const { id: userId } = req.user;
-    const { keterangan } = req.body;
+    const { keterangan, anggaran_terpakai } = req.body;
 
     const db = getPool();
     const [rows] = await db.query('SELECT t.*, b.parent_role FROM tasks t JOIN bidang b ON b.id = t.bidang_id WHERE t.id = ?', [id]);
@@ -371,6 +380,13 @@ async function submitReview(req, res) {
       return res.status(404).json({ success: false, message: 'Tugas tidak ditemukan.' });
     }
     const task = rows[0];
+    if (anggaran_terpakai === undefined || anggaran_terpakai === null || anggaran_terpakai === '') {
+      return res.status(400).json({ success: false, message: 'Anggaran terpakai wajib diisi, termasuk dengan nilai 0.' });
+    }
+    const spent = Number(anggaran_terpakai);
+    if (!Number.isFinite(spent) || spent < 0 || spent > Number(task.anggaran_dana)) {
+      return res.status(400).json({ success: false, message: 'Anggaran terpakai harus 0 atau lebih dan tidak boleh melebihi anggaran dana.' });
+    }
 
     if (task.assigned_to !== userId && req.user.role === 'STAF') {
       return res.status(403).json({ success: false, message: 'Hanya penerima tugas yang dapat mengirimkan bukti kerja.' });
@@ -386,8 +402,8 @@ async function submitReview(req, res) {
     }
 
     await db.query(
-      `UPDATE tasks SET status = 'UNDER_REVIEW', bukti_kerja = COALESCE(?, bukti_kerja) WHERE id = ?`,
-      [bukti_kerja, id]
+      `UPDATE tasks SET status = 'UNDER_REVIEW', anggaran_terpakai = ?, bukti_kerja = COALESCE(?, bukti_kerja) WHERE id = ?`,
+      [spent, bukti_kerja, id]
     );
 
     return res.json({ success: true, message: 'Tugas berhasil diajukan untuk review (UNDER_REVIEW).' });
@@ -466,6 +482,22 @@ async function deleteTask(req, res) {
       return res.status(404).json({ success: false, message: 'Tugas tidak ditemukan.' });
     }
 
+    async function deleteTasks(req, res) {
+      try {
+        const { ids } = req.body;
+        if (!Array.isArray(ids) || ids.length === 0) return res.status(400).json({ success: false, message: 'Pilih minimal satu program kerja.' });
+        if (req.user.role !== 'SUPER_ADMIN') return res.status(403).json({ success: false, message: 'Hanya Super Admin yang dapat menghapus banyak program kerja.' });
+        const normalizedIds = ids.map(Number).filter(Number.isInteger);
+        if (normalizedIds.length !== ids.length) return res.status(400).json({ success: false, message: 'Daftar ID program kerja tidak valid.' });
+        const db = getPool();
+        const placeholders = normalizedIds.map(() => '?').join(',');
+        const [result] = await db.query(`DELETE FROM tasks WHERE id IN (${placeholders})`, normalizedIds);
+        return res.json({ success: true, message: `${result.affectedRows} program kerja berhasil dihapus.` });
+      } catch (error) {
+        return res.status(500).json({ success: false, message: 'Gagal menghapus program kerja: ' + error.message });
+      }
+    }
+
     if (role !== 'SUPER_ADMIN' && role !== 'MUDIR' && rows[0].created_by !== userId) {
       return res.status(403).json({ success: false, message: 'Anda tidak berhak menghapus tugas ini.' });
     }
@@ -485,5 +517,6 @@ module.exports = {
   updateTaskStatus,
   submitReview,
   reviewTask,
-  deleteTask
+  deleteTask,
+  deleteTasks
 };

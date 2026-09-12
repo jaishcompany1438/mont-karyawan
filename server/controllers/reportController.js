@@ -125,7 +125,7 @@ async function getReportRows(req) {
     let query = `
       SELECT t.*,
              creator.nama AS creator_nama,
-             assignee.nama AS assignee_nama, assignee.email AS assignee_email,
+             assignee.nama AS assignee_nama, assignee.email AS assignee_email, assignee.no_telepon AS assignee_no_telepon,
              assignee.jabatan AS assignee_jabatan, assignee.sub_bidang AS assignee_sub_bidang,
              b.nama_bidang, b.kode_bidang
       FROM tasks t
@@ -196,6 +196,9 @@ async function exportExcelReport(req, res) {
       { header: 'Jabatan / Sub-Bidang', key: 'assignee_position', width: 32 },
       { header: 'Pemberi Tugas', key: 'creator', width: 22 },
       { header: 'Bidang / Divisi', key: 'bidang', width: 25 },
+      { header: 'Anggaran Dana', key: 'anggaran_dana', width: 18 },
+      { header: 'Anggaran Terpakai', key: 'anggaran_terpakai', width: 20 },
+      { header: 'Sisa Saldo', key: 'sisa_saldo', width: 18 },
       { header: 'Tenggat Waktu (Due Date)', key: 'due_date', width: 22 },
       { header: 'Catatan Revisi', key: 'catatan_revisi', width: 30 }
     ];
@@ -222,6 +225,9 @@ async function exportExcelReport(req, res) {
         assignee_position: [row.assignee_jabatan, row.assignee_sub_bidang].filter(Boolean).join(' / ') || '-',
         creator: row.creator_nama,
         bidang: row.nama_bidang,
+        anggaran_dana: Number(row.anggaran_dana || 0),
+        anggaran_terpakai: Number(row.anggaran_terpakai || 0),
+        sisa_saldo: Number(row.anggaran_dana || 0) - Number(row.anggaran_terpakai || 0),
         due_date: new Date(row.due_date).toLocaleString('id-ID'),
         catatan_revisi: row.catatan_revisi || '-'
       });
@@ -245,19 +251,20 @@ function createReportPdf(rows, filters) {
   const pageWidth = 842;
   const pageHeight = 595;
   const margin = 32;
+  const totalRemaining = rows.reduce((sum, row) => sum + Number(row.anggaran_dana || 0) - Number(row.anggaran_terpakai || 0), 0);
   const lines = [
     'LAPORAN REKAP KINERJA TUGAS',
     'PTQ Imam Ath Thobari',
     `Periode: ${filters.start_date || '-'} s/d ${filters.end_date || '-'}`,
-    `Total tugas: ${rows.length}`,
+    'Deskripsi                         Status             Anggaran Terpakai       Sisa Saldo',
     ''
   ];
   rows.forEach((row, index) => {
-    lines.push(`${index + 1}. ${row.judul} | ${row.status} | ${row.periode}`);
-    lines.push(`   Penerima: ${row.assignee_nama} | Bidang: ${row.nama_bidang}`);
-    lines.push(`   Tenggat: ${new Date(row.due_date).toLocaleString('id-ID')} | Prioritas: ${row.prioritas}`);
+    lines.push(`${index + 1}. ${(row.deskripsi || row.judul).slice(0, 32)} | ${row.status} | Rp ${Number(row.anggaran_terpakai || 0).toLocaleString('id-ID')} | Rp ${(Number(row.anggaran_dana || 0) - Number(row.anggaran_terpakai || 0)).toLocaleString('id-ID')}`);
+    lines.push(`   Program: ${row.judul.slice(0, 70)} | Penerima: ${row.assignee_nama}`);
     lines.push('');
   });
+  lines.push(`TOTAL SISA SALDO: Rp ${totalRemaining.toLocaleString('id-ID')}`);
 
   const content = [];
   let y = pageHeight - margin;
@@ -265,6 +272,9 @@ function createReportPdf(rows, filters) {
     if (y < margin) return;
     const fontSize = index < 2 ? 16 : 9;
     const font = index < 2 ? '/F2' : '/F1';
+    if (index >= 5 && line) {
+      content.push(`q 0.96 0.98 0.97 rg ${margin - 5} ${y - 4} 778 15 re f Q`);
+    }
     content.push(`BT ${font} ${fontSize} Tf ${margin} ${y} Td (${pdfEscape(line.slice(0, 125))}) Tj ET`);
     y -= index < 2 ? 22 : 13;
   });

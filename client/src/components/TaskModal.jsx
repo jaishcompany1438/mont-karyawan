@@ -11,6 +11,7 @@ export default function TaskModal({ isOpen, onClose, onSuccess, initialTask = nu
   const [assignedTo, setAssignedTo] = useState('');
   const [dueDate, setDueDate] = useState('');
   const [isRecurring, setIsRecurring] = useState(true);
+  const [anggaranDana, setAnggaranDana] = useState('0');
   const [attachment, setAttachment] = useState(null);
 
   const [assignees, setAssignees] = useState([]);
@@ -28,6 +29,7 @@ export default function TaskModal({ isOpen, onClose, onSuccess, initialTask = nu
         setPrioritas(initialTask.prioritas || 'SEDANG');
         setAssignedTo(initialTask.assigned_to || '');
         setIsRecurring(Boolean(initialTask.is_recurring));
+        setAnggaranDana(String(initialTask.anggaran_dana ?? 0));
         if (initialTask.due_date) {
           const date = new Date(initialTask.due_date);
           setDueDate(date.toISOString().slice(0, 16));
@@ -46,6 +48,7 @@ export default function TaskModal({ isOpen, onClose, onSuccess, initialTask = nu
         setDueDate(tomorrow.toISOString().slice(0, 16));
         setAttachment(null);
         setIsRecurring(true);
+        setAnggaranDana('0');
       }
       setError('');
     }
@@ -69,8 +72,8 @@ export default function TaskModal({ isOpen, onClose, onSuccess, initialTask = nu
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!judul.trim() || !assignedTo || !dueDate) {
-      setError('Judul tugas, penerima tugas, dan tenggat waktu wajib diisi.');
+    if (!judul.trim() || !assignedTo || !dueDate || anggaranDana === '') {
+      setError('Judul, penerima, tenggat waktu, dan anggaran dana wajib diisi.');
       return;
     }
 
@@ -87,6 +90,7 @@ export default function TaskModal({ isOpen, onClose, onSuccess, initialTask = nu
       formData.append('assigned_to', assignedTo);
       formData.append('due_date', dueDate);
       formData.append('is_recurring', isRecurring ? '1' : '0');
+      formData.append('anggaran_dana', anggaranDana);
 
       if (attachment) {
         formData.append('attachment', attachment);
@@ -173,6 +177,11 @@ export default function TaskModal({ isOpen, onClose, onSuccess, initialTask = nu
                 <option value="BULANAN">BULANAN (Monthly)</option>
                 <option value="TAHUNAN">TAHUNAN (Annual)</option>
               </select>
+            </div>
+            <div>
+              <label className="block font-bold text-slate-700 mb-1">Anggaran Dana *</label>
+              <input required min="0" step="0.01" type="number" value={anggaranDana} onChange={(e) => setAnggaranDana(e.target.value)} className="w-full px-3 py-2 rounded-xl border border-slate-300 focus:ring-2 focus:ring-emerald-500 text-slate-800" />
+              <p className="mt-1 text-[10px] text-slate-500">Isi 0 jika tidak ada pengeluaran tunai.</p>
             </div>
 
             <div>
