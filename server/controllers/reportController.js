@@ -1,4 +1,8 @@
 const ExcelJS = require('exceljs');
+const fs = require('fs');
+const path = require('path');
+const PDFDocument = require('pdfkit');
+const SVGtoPDF = require('svg-to-pdfkit');
 const { getPool, isDbConnected } = require('../config/db');
 
 // GET /api/reports/dashboard
@@ -243,67 +247,154 @@ async function exportExcelReport(req, res) {
   }
 }
 
-function pdfEscape(value) {
-  return String(value || '-').replace(/\\/g, '\\\\').replace(/\(/g, '\\(').replace(/\)/g, '\\)');
+function formatPdfCurrency(value) {
+  return `Rp ${Number(value || 0).toLocaleString('id-ID')}`;
+}
+
+function getReportLogo() {
+  const candidates = [
+    path.join(__dirname, '../../client/public/logo.svg'),
+    path.join(__dirname, '../../client/dist/logo.svg')
+  ];
+  const logoPath = candidates.find((candidate) => fs.existsSync(candidate));
+  return logoPath ? fs.readFileSync(logoPath, 'utf8') : null;
+}
+
+function getPdfStatus(status) {
+  return {
+    DONE: 'Selesai',
+    IN_PROGRESS: 'Sedang Dikerjakan',
+    TO_DO: 'Belum Mulai',
+    REVIEW: 'Menunggu Review',
+    REVISION: 'Perlu Revisi',
+    OVERDUE: 'Lewat Waktu'
+  }[status] || status || '-';
 }
 
 function createReportPdf(rows, filters) {
-  const pageWidth = 842;
-  const pageHeight = 595;
-  const margin = 32;
-  const totalRemaining = rows.reduce((sum, row) => sum + Number(row.anggaran_dana || 0) - Number(row.anggaran_terpakai || 0), 0);
-  const lines = [
-    'LAPORAN REKAP KINERJA TUGAS',
-    'PTQ Imam Ath Thobari',
-    `Periode: ${filters.start_date || '-'} s/d ${filters.end_date || '-'}`,
-    'Deskripsi                         Status             Anggaran Terpakai       Sisa Saldo',
-    ''
-  ];
-  rows.forEach((row, index) => {
-    lines.push(`${index + 1}. ${(row.deskripsi || row.judul).slice(0, 32)} | ${row.status} | Rp ${Number(row.anggaran_terpakai || 0).toLocaleString('id-ID')} | Rp ${(Number(row.anggaran_dana || 0) - Number(row.anggaran_terpakai || 0)).toLocaleString('id-ID')}`);
-    lines.push(`   Program: ${row.judul.slice(0, 70)} | Penerima: ${row.assignee_nama}`);
-    lines.push('');
-  });
-  lines.push(`TOTAL SISA SALDO: Rp ${totalRemaining.toLocaleString('id-ID')}`);
+  return new Promise((resolve, reject) => {
+    const doc = new PDFDocument({ size: 'A4', margin: 0, bufferPages: true, autoFirstPage: false });
+    const chunks = [];
+    doc.on('data', (chunk) => chunks.push(chunk));
+    doc.on('end', () => resolve(Buffer.concat(chunks)));
+    doc.on('error', reject);
 
-  const content = [];
-  let y = pageHeight - margin;
-  lines.forEach((line, index) => {
-    if (y < margin) return;
-    const fontSize = index < 2 ? 16 : 9;
-    const font = index < 2 ? '/F2' : '/F1';
-    if (index >= 5 && line) {
-      content.push(`q 0.96 0.98 0.97 rg ${margin - 5} ${y - 4} 778 15 re f Q`);
+    const pageWidth = 595.28;
+    const pageHeight = 841.89;
+    const margin = 42;
+    const contentWidth = pageWidth - margin * 2;
+    const green = '#047857';
+    const lightGreen = '#ECFDF5';
+    const border = '#D1D5DB';
+    const muted = '#64748B';
+    const logo = getReportLogo();
+    const bidangNames = [...new Set(rows.map((row) => row.nama_bidang).filter(Boolean))];
+    const bidangName = filters.nama_bidang || (bidangNames.length ? bidangNames.join(', ') : 'Semua Bidang');
+    const totalRemaining = rows.reduce(
+      (sum, row) => sum + Number(row.anggaran_dana || 0) - Number(row.anggaran_terpakai || 0),
+      0
+    );
+    const columns = [
+      { label: 'Deskripsi program kerja', x: margin, width: 245 },
+      { label: 'Status', x: margin + 245, width: 85 },
+      { label: 'Anggaran terpakai', x: margin + 330, width: 105 },
+      { label: 'Sisa Saldo', x: margin + 435, width: contentWidth - 435 }
+    ];
+
+    const drawHeader = () => {
+      doc.addPage();
+      let y = 42;
+      if (logo) {
+        SVGtoPDF(doc, logo, margin, y, { width: 54, height: 54 });
+      } else {
+        doc.roundedRect(margin, y, 54, 54, 10).fill(green);
+      }
+      const textX = margin + 68;
+      doc.fillColor('#0F172A').font('Helvetica-Bold').fontSize(17)
+        .text('LAPORAN REKAP KINERJA TUGAS', textX, y + 2, { width: contentWidth - 68 });
+      doc.fontSize(11).text('PTQ Imam Ath Thobari', textX, y + 27);
+      doc.fillColor(muted).font('Helvetica').fontSize(9)
+        .text(`Periode: ${filters.start_date || '-'} s/d ${filters.end_date || '-'}`, textX, y + 43);
+      y += 78;
+      doc.fillColor(muted).font('Helvetica-Bold').fontSize(9).text('KABID :', margin, y);
+      doc.fillColor('#0F172A').font('Helvetica').fontSize(11).text(bidangName, margin, y + 14);
+      return y + 42;
+    };
+
+    const drawTableHeader = (y) => {
+      doc.save().roundedRect(margin, y, contentWidth, 30, 7).fill(green).restore();
+      doc.fillColor('#FFFFFF').font('Helvetica-Bold').fontSize(8);
+      columns.forEach((column) => doc.text(column.label, column.x + 8, y + 10, {
+        width: column.width - 16,
+        lineBreak: false
+      }));
+      return y + 30;
+    };
+
+    const getRowHeight = (row) => {
+      const description = `${row.deskripsi || row.judul || '-'}${row.deskripsi && row.judul && row.deskripsi !== row.judul ? `\n${row.judul}` : ''}`;
+      const descriptionHeight = doc.heightOfString(description, { width: columns[0].width - 16, fontSize: 8.5 });
+      const statusHeight = doc.heightOfString(getPdfStatus(row.status), { width: columns[1].width - 16, fontSize: 8 });
+      return Math.max(31, Math.ceil(Math.max(descriptionHeight, statusHeight) + 16));
+    };
+
+    let y = drawHeader();
+    y = drawTableHeader(y);
+    doc.font('Helvetica').fontSize(8).fillColor('#1E293B');
+
+    rows.forEach((row, index) => {
+      const rowHeight = getRowHeight(row);
+      if (y + rowHeight > pageHeight - 76) {
+        y = drawHeader();
+        y = drawTableHeader(y);
+      }
+      const remaining = Number(row.anggaran_dana || 0) - Number(row.anggaran_terpakai || 0);
+      if (index % 2 === 0) {
+        doc.save().rect(margin, y, contentWidth, rowHeight).fill('#F8FAFC').restore();
+      }
+      doc.strokeColor(border).lineWidth(0.45).moveTo(margin, y + rowHeight).lineTo(margin + contentWidth, y + rowHeight).stroke();
+      const values = [
+        `${index + 1}. ${row.deskripsi || row.judul || '-'}`,
+        getPdfStatus(row.status),
+        formatPdfCurrency(row.anggaran_terpakai),
+        formatPdfCurrency(remaining)
+      ];
+      values.forEach((value, columnIndex) => {
+        const column = columns[columnIndex];
+        doc.fillColor('#1E293B').font(columnIndex === 0 ? 'Helvetica' : 'Helvetica')
+          .fontSize(columnIndex === 0 ? 8.5 : 8)
+          .text(value, column.x + 8, y + 8, {
+            width: column.width - 16,
+            height: rowHeight - 12,
+            align: columnIndex > 1 ? 'right' : 'left'
+          });
+      });
+      y += rowHeight;
+    });
+
+    if (!rows.length) {
+      doc.save().roundedRect(margin, y, contentWidth, 38, 7).fill('#F8FAFC').restore();
+      doc.fillColor(muted).font('Helvetica').fontSize(9).text('Tidak ada data pada periode ini.', margin + 10, y + 14);
+      y += 38;
     }
-    content.push(`BT ${font} ${fontSize} Tf ${margin} ${y} Td (${pdfEscape(line.slice(0, 125))}) Tj ET`);
-    y -= index < 2 ? 22 : 13;
+    if (y + 48 > pageHeight - 42) {
+      y = drawHeader();
+    }
+    doc.save().roundedRect(margin, y + 18, contentWidth, 35, 8).fill(lightGreen).restore();
+    doc.fillColor(green).font('Helvetica-Bold').fontSize(10)
+      .text('TOTAL SISA SALDO', margin + 12, y + 31);
+    doc.text(formatPdfCurrency(totalRemaining), margin + contentWidth - 170, y + 31, {
+      width: 158,
+      align: 'right'
+    });
+    doc.end();
   });
-
-  const objects = [
-    '<< /Type /Catalog /Pages 2 0 R >>',
-    '<< /Type /Pages /Kids [3 0 R] /Count 1 >>',
-    `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${pageWidth} ${pageHeight}] /Resources << /Font << /F1 4 0 R /F2 5 0 R >> >> /Contents 6 0 R >>`,
-    '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>',
-    '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>',
-    `<< /Length ${content.join('\n').length} >>\nstream\n${content.join('\n')}\nendstream`
-  ];
-  let pdf = '%PDF-1.4\n';
-  const offsets = [0];
-  objects.forEach((object, index) => {
-    offsets[index + 1] = Buffer.byteLength(pdf, 'utf8');
-    pdf += `${index + 1} 0 obj\n${object}\nendobj\n`;
-  });
-  const xref = Buffer.byteLength(pdf, 'utf8');
-  pdf += `xref\n0 ${objects.length + 1}\n0000000000 65535 f \n`;
-  offsets.slice(1).forEach((offset) => { pdf += `${String(offset).padStart(10, '0')} 00000 n \n`; });
-  pdf += `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF`;
-  return Buffer.from(pdf, 'utf8');
 }
 
 async function exportPdfReport(req, res) {
   try {
     const rows = await getReportRows(req);
-    const pdf = createReportPdf(rows, req.query);
+    const pdf = await createReportPdf(rows, req.query);
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `attachment; filename="rekap_kinerja_${Date.now()}.pdf"`);
     return res.send(pdf);
