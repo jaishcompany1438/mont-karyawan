@@ -482,22 +482,6 @@ async function deleteTask(req, res) {
       return res.status(404).json({ success: false, message: 'Tugas tidak ditemukan.' });
     }
 
-    async function deleteTasks(req, res) {
-      try {
-        const { ids } = req.body;
-        if (!Array.isArray(ids) || ids.length === 0) return res.status(400).json({ success: false, message: 'Pilih minimal satu program kerja.' });
-        if (req.user.role !== 'SUPER_ADMIN') return res.status(403).json({ success: false, message: 'Hanya Super Admin yang dapat menghapus banyak program kerja.' });
-        const normalizedIds = ids.map(Number).filter(Number.isInteger);
-        if (normalizedIds.length !== ids.length) return res.status(400).json({ success: false, message: 'Daftar ID program kerja tidak valid.' });
-        const db = getPool();
-        const placeholders = normalizedIds.map(() => '?').join(',');
-        const [result] = await db.query(`DELETE FROM tasks WHERE id IN (${placeholders})`, normalizedIds);
-        return res.json({ success: true, message: `${result.affectedRows} program kerja berhasil dihapus.` });
-      } catch (error) {
-        return res.status(500).json({ success: false, message: 'Gagal menghapus program kerja: ' + error.message });
-      }
-    }
-
     if (role !== 'SUPER_ADMIN' && role !== 'MUDIR' && rows[0].created_by !== userId) {
       return res.status(403).json({ success: false, message: 'Anda tidak berhak menghapus tugas ini.' });
     }
@@ -506,6 +490,33 @@ async function deleteTask(req, res) {
     return res.json({ success: true, message: 'Tugas berhasil dihapus.' });
   } catch (error) {
     return res.status(500).json({ success: false, message: 'Gagal menghapus tugas: ' + error.message });
+  }
+}
+
+// DELETE /api/tasks (bulk delete; Super Admin only)
+async function deleteTasks(req, res) {
+  try {
+    const { ids } = req.body;
+    if (!Array.isArray(ids) || ids.length === 0) {
+      return res.status(400).json({ success: false, message: 'Pilih minimal satu program kerja.' });
+    }
+    if (req.user.role !== 'SUPER_ADMIN') {
+      return res.status(403).json({ success: false, message: 'Hanya Super Admin yang dapat menghapus banyak program kerja.' });
+    }
+
+    const normalizedIds = ids.map(Number).filter(Number.isInteger);
+    if (normalizedIds.length !== ids.length) {
+      return res.status(400).json({ success: false, message: 'Daftar ID program kerja tidak valid.' });
+    }
+
+    const placeholders = normalizedIds.map(() => '?').join(',');
+    const [result] = await getPool().query(
+      `DELETE FROM tasks WHERE id IN (${placeholders})`,
+      normalizedIds
+    );
+    return res.json({ success: true, message: `${result.affectedRows} program kerja berhasil dihapus.` });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: 'Gagal menghapus program kerja: ' + error.message });
   }
 }
 
