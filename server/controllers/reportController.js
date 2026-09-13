@@ -271,6 +271,87 @@ function getPdfStatus(status) {
   }[status] || status || '-';
 }
 
+function parseReportDate(value) {
+  if (!value) return null;
+  const date = new Date(`${value}T00:00:00`);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function getExpectedOccurrences(period, startDate, endDate, actualCount) {
+  if (!startDate || !endDate || endDate < startDate) return actualCount;
+  const start = new Date(startDate);
+  const end = new Date(endDate);
+  if (period === 'PEKANAN') {
+    return Math.floor((end - start) / (7 * 24 * 60 * 60 * 1000)) + 1;
+  }
+  if (period === 'BULANAN') {
+    return (end.getFullYear() - start.getFullYear()) * 12
+      + end.getMonth() - start.getMonth() + 1;
+  }
+  if (period === 'TAHUNAN') {
+    return end.getFullYear() - start.getFullYear() + 1;
+  }
+  return Math.floor((end - start) / (24 * 60 * 60 * 1000)) + 1;
+}
+
+function aggregateReportRows(rows, filters = {}) {
+  const startDate = parseReportDate(filters.start_date);
+  const endDate = parseReportDate(filters.end_date);
+  const groups = rows.reduce((result, row) => {
+    const key = String(row.judul || row.deskripsi || '-').trim();
+    if (!result[key]) {
+      result[key] = {
+        judul: key,
+        deskripsi: row.deskripsi || row.judul || '-',
+        periode: row.periode || 'HARIAN',
+        frequency: 0,
+        completed: 0,
+        totalBudget: 0,
+        totalSpent: 0
+      };
+    }
+    const group = result[key];
+    group.frequency += 1;
+    if (['COMPLETED', 'DONE'].includes(row.status)) group.completed += 1;
+    group.totalBudget += Number(row.anggaran_dana || 0);
+    group.totalSpent += Number(row.anggaran_terpakai || 0);
+    return result;
+  }, {});
+
+  return Object.values(groups).map((group) => {
+    const target = getExpectedOccurrences(group.periode, startDate, endDate, group.frequency);
+    const progress = target > 0 ? Math.min(100, Math.round((group.completed / target) * 100)) : 0;
+    return {
+      ...group,
+      target,
+      progress,
+      remaining: group.totalBudget - group.totalSpent
+    };
+  });
+}
+
+function getPeriodLabel(period) {
+  return {
+    HARIAN: 'Harian',
+    PEKANAN: 'Pekanan',
+    BULANAN: 'Bulanan',
+    TAHUNAN: 'Tahunan'
+  }[period] || period || '-';
+}
+
+function getReportSummary(rows, aggregatedRows, filters) {
+  const startDate = parseReportDate(filters.start_date);
+  const endDate = parseReportDate(filters.end_date);
+  const totalWorkDays = startDate && endDate && endDate >= startDate
+    ? Math.floor((endDate - startDate) / (24 * 60 * 60 * 1000)) + 1
+    : new Set(rows.map((row) => new Date(row.due_date).toISOString().slice(0, 10))).size;
+  return {
+    totalWorkDays,
+    completedPrograms: aggregatedRows.filter((row) => row.progress >= 100).length,
+    totalBudget: aggregatedRows.reduce((sum, row) => sum + row.totalBudget, 0)
+  };
+}
+
 function createReportPdf(rows, filters) {
   return new Promise((resolve, reject) => {
     const doc = new PDFDocument({ size: 'A4', margin: 0, bufferPages: true, autoFirstPage: false });
@@ -288,17 +369,16 @@ function createReportPdf(rows, filters) {
     const border = '#D1D5DB';
     const muted = '#64748B';
     const logo = getReportLogo();
+    const aggregatedRows = aggregateReportRows(rows, filters);
+    const summary = getReportSummary(rows, aggregatedRows, filters);
     const bidangNames = [...new Set(rows.map((row) => row.nama_bidang).filter(Boolean))];
     const bidangName = filters.nama_bidang || (bidangNames.length ? bidangNames.join(', ') : 'Semua Bidang');
-    const totalRemaining = rows.reduce(
-      (sum, row) => sum + Number(row.anggaran_dana || 0) - Number(row.anggaran_terpakai || 0),
-      0
-    );
     const columns = [
-      { label: 'Deskripsi program kerja', x: margin, width: 245 },
-      { label: 'Status', x: margin + 245, width: 85 },
-      { label: 'Anggaran terpakai', x: margin + 330, width: 105 },
-      { label: 'Sisa Saldo', x: margin + 435, width: contentWidth - 435 }
+      { label: 'Deskripsi Program Kerja', x: margin, width: 190 },
+      { label: 'Periode & Kuantitas', x: margin + 190, width: 100 },
+      { label: 'Progress', x: margin + 290, width: 58 },
+      { label: 'Total Anggaran', x: margin + 348, width: 92 },
+      { label: 'Sisa Saldo', x: margin + 440, width: contentWidth - 440 }
     ];
 
     const drawHeader = () => {
@@ -321,6 +401,26 @@ function createReportPdf(rows, filters) {
       return y + 42;
     };
 
+    const drawSummary = (y) => {
+      const boxHeight = 48;
+      const boxWidth = contentWidth / 3;
+      const items = [
+        ['Total Hari Kerja', `${summary.totalWorkDays} Hari`],
+        ['Total Program Selesai', `${summary.completedPrograms}`],
+        ['Total Anggaran Keseluruhan', formatPdfCurrency(summary.totalBudget)]
+      ];
+      items.forEach(([label, value], index) => {
+        const x = margin + index * boxWidth;
+        doc.save().roundedRect(x, y, boxWidth - 5, boxHeight, 7).fill('#F8FAFC').restore();
+        doc.fillColor(muted).font('Helvetica').fontSize(7.5).text(label, x + 8, y + 10, {
+          width: boxWidth - 21
+        });
+        doc.fillColor('#0F172A').font('Helvetica-Bold').fontSize(index === 2 ? 9 : 11)
+          .text(value, x + 8, y + 26, { width: boxWidth - 21 });
+      });
+      return y + boxHeight + 16;
+    };
+
     const drawTableHeader = (y) => {
       doc.save().roundedRect(margin, y, contentWidth, 30, 7).fill(green).restore();
       doc.fillColor('#FFFFFF').font('Helvetica-Bold').fontSize(8);
@@ -332,32 +432,34 @@ function createReportPdf(rows, filters) {
     };
 
     const getRowHeight = (row) => {
-      const description = `${row.deskripsi || row.judul || '-'}${row.deskripsi && row.judul && row.deskripsi !== row.judul ? `\n${row.judul}` : ''}`;
+      const description = row.deskripsi || row.judul || '-';
+      const period = `${getPeriodLabel(row.periode)} (${row.frequency}x)`;
       const descriptionHeight = doc.heightOfString(description, { width: columns[0].width - 16, fontSize: 8.5 });
-      const statusHeight = doc.heightOfString(getPdfStatus(row.status), { width: columns[1].width - 16, fontSize: 8 });
-      return Math.max(31, Math.ceil(Math.max(descriptionHeight, statusHeight) + 16));
+      const periodHeight = doc.heightOfString(period, { width: columns[1].width - 16, fontSize: 8 });
+      return Math.max(31, Math.ceil(Math.max(descriptionHeight, periodHeight) + 16));
     };
 
     let y = drawHeader();
+    y = drawSummary(y);
     y = drawTableHeader(y);
     doc.font('Helvetica').fontSize(8).fillColor('#1E293B');
 
-    rows.forEach((row, index) => {
+    aggregatedRows.forEach((row, index) => {
       const rowHeight = getRowHeight(row);
       if (y + rowHeight > pageHeight - 76) {
         y = drawHeader();
         y = drawTableHeader(y);
       }
-      const remaining = Number(row.anggaran_dana || 0) - Number(row.anggaran_terpakai || 0);
       if (index % 2 === 0) {
         doc.save().rect(margin, y, contentWidth, rowHeight).fill('#F8FAFC').restore();
       }
       doc.strokeColor(border).lineWidth(0.45).moveTo(margin, y + rowHeight).lineTo(margin + contentWidth, y + rowHeight).stroke();
       const values = [
         `${index + 1}. ${row.deskripsi || row.judul || '-'}`,
-        getPdfStatus(row.status),
-        formatPdfCurrency(row.anggaran_terpakai),
-        formatPdfCurrency(remaining)
+        `${getPeriodLabel(row.periode)} (${row.frequency}x)`,
+        `${row.progress}%`,
+        formatPdfCurrency(row.totalSpent),
+        formatPdfCurrency(row.remaining)
       ];
       values.forEach((value, columnIndex) => {
         const column = columns[columnIndex];
@@ -366,13 +468,13 @@ function createReportPdf(rows, filters) {
           .text(value, column.x + 8, y + 8, {
             width: column.width - 16,
             height: rowHeight - 12,
-            align: columnIndex > 1 ? 'right' : 'left'
+            align: columnIndex >= 2 ? 'right' : 'left'
           });
       });
       y += rowHeight;
     });
 
-    if (!rows.length) {
+    if (!aggregatedRows.length) {
       doc.save().roundedRect(margin, y, contentWidth, 38, 7).fill('#F8FAFC').restore();
       doc.fillColor(muted).font('Helvetica').fontSize(9).text('Tidak ada data pada periode ini.', margin + 10, y + 14);
       y += 38;
@@ -383,6 +485,7 @@ function createReportPdf(rows, filters) {
     doc.save().roundedRect(margin, y + 18, contentWidth, 35, 8).fill(lightGreen).restore();
     doc.fillColor(green).font('Helvetica-Bold').fontSize(10)
       .text('TOTAL SISA SALDO', margin + 12, y + 31);
+    const totalRemaining = aggregatedRows.reduce((sum, row) => sum + row.remaining, 0);
     doc.text(formatPdfCurrency(totalRemaining), margin + contentWidth - 170, y + 31, {
       width: 158,
       align: 'right'
@@ -407,5 +510,6 @@ async function exportPdfReport(req, res) {
 module.exports = {
   getDashboardStats,
   exportExcelReport,
-  exportPdfReport
+  exportPdfReport,
+  aggregateReportRows
 };
