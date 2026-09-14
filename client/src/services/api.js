@@ -268,5 +268,61 @@ export const api = {
       body: formData
     });
     return handleResponse(res);
+  },
+
+  // Notifications
+  async getNotifications() {
+    const res = await fetch(`${BASE_URL}/notifications`, {
+      headers: getHeaders()
+    });
+    return handleResponse(res);
+  },
+
+  async markNotificationRead(id) {
+    const res = await fetch(`${BASE_URL}/notifications/${id}/read`, {
+      method: 'PATCH',
+      headers: getHeaders()
+    });
+    return handleResponse(res);
+  },
+
+  async markAllNotificationsRead() {
+    const res = await fetch(`${BASE_URL}/notifications/read-all`, {
+      method: 'PATCH',
+      headers: getHeaders()
+    });
+    return handleResponse(res);
+  },
+
+  // Cross Department Requests
+  async getCrossRequests(params = {}) {
+    const query = new URLSearchParams();
+    Object.entries(params).forEach(([k, v]) => {
+      if (v) query.append(k, v);
+    });
+    const res = await fetch(`${BASE_URL}/cross-requests?${query.toString()}`, {
+      headers: getHeaders()
+    });
+    return handleResponse(res);
+  },
+
+  async createCrossRequest(formData) {
+    const isFormData = formData instanceof FormData;
+    const res = await fetch(`${BASE_URL}/cross-requests`, {
+      method: 'POST',
+      headers: getHeaders(isFormData),
+      body: isFormData ? formData : JSON.stringify(formData)
+    });
+    return handleResponse(res);
+  },
+
+  async respondCrossRequest(id, data) {
+    const res = await fetch(`${BASE_URL}/cross-requests/${id}/respond`, {
+      method: 'PATCH',
+      headers: getHeaders(),
+      body: JSON.stringify(data)
+    });
+    return handleResponse(res);
   }
 };
+

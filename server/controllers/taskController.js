@@ -1,4 +1,5 @@
 const { getPool, isDbConnected } = require('../config/db');
+const { createNotification } = require('./notificationController');
 
 function recurringFlag(value, defaultValue) {
   if (value === undefined || value === null || value === '') return defaultValue;
@@ -243,6 +244,16 @@ async function createTask(req, res) {
       ]
     );
 
+    // Notify assignee
+    await createNotification({
+      userId: assignee.id,
+      judul: `Tugas Baru: ${judul.trim()}`,
+      pesan: `Anda menerima penugasan baru "${judul.trim()}" (Prioritas: ${prioritas}). Batas waktu: ${new Date(due_date).toLocaleDateString('id-ID')}.`,
+      tipe: 'PERINTAH_ATASAN',
+      referenceId: result.insertId,
+      referenceType: 'tasks'
+    });
+
     return res.status(201).json({
       success: true,
       message: 'Tugas berhasil dibuat.',
@@ -406,6 +417,16 @@ async function submitReview(req, res) {
       [spent, bukti_kerja, id]
     );
 
+    // Notify task creator
+    await createNotification({
+      userId: task.created_by,
+      judul: `Bukti Kerja Dikirim: ${task.judul}`,
+      pesan: `${req.user.nama} telah mengunggah bukti kerja untuk tugas "${task.judul}". Siap untuk diverifikasi.`,
+      tipe: 'REVIEW_PEKERJAAN',
+      referenceId: task.id,
+      referenceType: 'tasks'
+    });
+
     return res.json({ success: true, message: 'Tugas berhasil diajukan untuk review (UNDER_REVIEW).' });
   } catch (error) {
     return res.status(500).json({ success: false, message: 'Gagal mengirimkan tugas untuk review: ' + error.message });
@@ -458,6 +479,18 @@ async function reviewTask(req, res) {
       `UPDATE tasks SET status = ?, catatan_revisi = ? WHERE id = ?`,
       [newStatus, notes, id]
     );
+
+    // Notify assignee
+    await createNotification({
+      userId: task.assigned_to,
+      judul: action === 'APPROVE' ? `Tugas Disetujui: ${task.judul}` : `Perlu Revisi: ${task.judul}`,
+      pesan: action === 'APPROVE'
+        ? `Alhamdulillah! Tugas "${task.judul}" telah disetujui dan dinyatakan selesai.`
+        : `Tugas "${task.judul}" memerlukan revisi. Catatan: ${notes}`,
+      tipe: action === 'APPROVE' ? 'INFO' : 'REVISI_PEKERJAAN',
+      referenceId: task.id,
+      referenceType: 'tasks'
+    });
 
     return res.json({
       success: true,

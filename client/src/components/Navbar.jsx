@@ -1,6 +1,7 @@
 import React from 'react';
 import { useAuth } from '../context/AuthContext';
 import { LogOut, User, Shield, Briefcase, Building2 } from 'lucide-react';
+import NotificationDropdown from './NotificationDropdown';
 
 export default function Navbar({ onMenuToggle }) {
   const { user, logout } = useAuth();
@@ -81,6 +82,7 @@ export default function Navbar({ onMenuToggle }) {
           </div>
 
           <div className="flex items-center space-x-1 sm:space-x-2">
+            <NotificationDropdown />
             <button
               onClick={logout}
               title="Keluar / Logout"
