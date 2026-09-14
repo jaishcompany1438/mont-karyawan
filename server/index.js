@@ -15,6 +15,8 @@ const bidangRoutes = require('./routes/bidangRoutes');
 const taskRoutes = require('./routes/taskRoutes');
 const excelRoutes = require('./routes/excelRoutes');
 const reportRoutes = require('./routes/reportRoutes');
+const crossRequestRoutes = require('./routes/crossRequestRoutes');
+const notificationRoutes = require('./routes/notificationRoutes');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -39,6 +41,8 @@ app.use('/api/tasks', taskRoutes);
 app.use('/api/templates', excelRoutes);
 app.use('/api/import', excelRoutes);
 app.use('/api/reports', reportRoutes);
+app.use('/api/cross-requests', crossRequestRoutes);
+app.use('/api/notifications', notificationRoutes);
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {

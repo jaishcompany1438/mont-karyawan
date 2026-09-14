@@ -98,6 +98,53 @@ async function initDB() {
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
     `);
 
+    // 4. Tabel Pengajuan Tugas Lintas Bidang
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS cross_department_requests (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        judul VARCHAR(255) NOT NULL,
+        deskripsi TEXT NOT NULL,
+        urgensi ENUM('RENDAH', 'SEDANG', 'TINGGI', 'URGEN') NOT NULL DEFAULT 'SEDANG',
+        due_date DATETIME NOT NULL,
+        file_attachment VARCHAR(255) NULL,
+        status ENUM('PENDING', 'APPROVED', 'REJECTED', 'COMPLETED') NOT NULL DEFAULT 'PENDING',
+        catatan_tanggapan TEXT NULL,
+        from_user_id INT NOT NULL,
+        from_bidang_id INT NOT NULL,
+        target_bidang_id INT NOT NULL,
+        converted_task_id INT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        FOREIGN KEY (from_user_id) REFERENCES users(id) ON DELETE CASCADE,
+        FOREIGN KEY (from_bidang_id) REFERENCES bidang(id) ON DELETE CASCADE,
+        FOREIGN KEY (target_bidang_id) REFERENCES bidang(id) ON DELETE CASCADE,
+        FOREIGN KEY (converted_task_id) REFERENCES tasks(id) ON DELETE SET NULL
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    `);
+
+    // 5. Tabel Notifikasi
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS notifications (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        user_id INT NOT NULL,
+        judul VARCHAR(255) NOT NULL,
+        pesan TEXT NOT NULL,
+        tipe ENUM(
+          'PERINTAH_ATASAN',
+          'REVISI_PEKERJAAN',
+          'PENGAJUAN_LINTAS_BIDANG',
+          'REVIEW_PEKERJAAN',
+          'INFO'
+        ) NOT NULL DEFAULT 'INFO',
+        reference_id INT NULL,
+        reference_type VARCHAR(50) NULL,
+        is_read TINYINT(1) NOT NULL DEFAULT 0,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    `);
+
+
     // Lightweight migrations for installations created before recurring tasks
     // and staff sub-bidang support were introduced.
     const migrations = [
