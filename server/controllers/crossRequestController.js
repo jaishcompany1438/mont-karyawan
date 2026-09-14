@@ -8,7 +8,16 @@ async function createCrossRequest(req, res) {
       return res.status(503).json({ success: false, message: 'Database belum terhubung.' });
     }
 
-    const { id: fromUserId, bidang_id: fromBidangId, nama: fromUserNama } = req.user;
+    const { id: fromUserId, bidang_id: fromBidangId, nama: fromUserNama, role: userRole } = req.user;
+
+    // Bawahan bidang (STAF) tidak memiliki izin mengajukan tugas antar bidang
+    if (userRole === 'STAF') {
+      return res.status(403).json({
+        success: false,
+        message: 'Akses ditolak. Staf pelaksana (bawahan bidang) tidak memiliki izin untuk mengajukan tugas antar bidang. Pengajuan harus melalui Kepala Bidang atau Pimpinan.'
+      });
+    }
+
     const { target_bidang_id, judul, deskripsi, urgensi = 'SEDANG', due_date } = req.body;
 
     if (!target_bidang_id || !judul || !deskripsi || !due_date) {
@@ -18,8 +27,6 @@ async function createCrossRequest(req, res) {
       });
     }
 
-    const effectiveFromBidangId = fromBidangId || 1;
-    const file_attachment = req.file ? `/uploads/${req.file.filename}` : null;
     const db = getPool();
 
     // Verify target department exists
@@ -27,6 +34,20 @@ async function createCrossRequest(req, res) {
     if (targetDept.length === 0) {
       return res.status(400).json({ success: false, message: 'Bidang tujuan tidak ditemukan.' });
     }
+
+    // Safely determine from_bidang_id: query user's actual department and verify existence
+    const [userRow] = await db.query('SELECT bidang_id FROM users WHERE id = ?', [fromUserId]);
+    const candidateBidangId = userRow[0]?.bidang_id || fromBidangId || null;
+
+    let effectiveFromBidangId = null;
+    if (candidateBidangId) {
+      const [checkBidang] = await db.query('SELECT id FROM bidang WHERE id = ?', [candidateBidangId]);
+      if (checkBidang.length > 0) {
+        effectiveFromBidangId = candidateBidangId;
+      }
+    }
+
+    const file_attachment = req.file ? `/uploads/${req.file.filename}` : null;
 
     const [result] = await db.query(
       `INSERT INTO cross_department_requests (
@@ -83,33 +104,36 @@ async function getCrossRequests(req, res) {
     }
 
     const { role, bidang_id: userBidangId, id: userId } = req.user;
+
+    if (role === 'STAF') {
+      return res.status(403).json({ success: false, message: 'Akses terbatas untuk Kepala Bidang dan Pimpinan.' });
+    }
+
     const { status, target_bidang_id } = req.query;
     const db = getPool();
 
     let query = `
       SELECT cr.*,
              u.nama AS from_user_nama, u.email AS from_user_email, u.jabatan AS from_user_jabatan,
-             fb.nama_bidang AS from_bidang_nama, fb.kode_bidang AS from_bidang_kode,
+             COALESCE(fb.nama_bidang, 'Pimpinan / Lembaga') AS from_bidang_nama,
+             COALESCE(fb.kode_bidang, 'LEMBAGA') AS from_bidang_kode,
              tb.nama_bidang AS target_bidang_nama, tb.kode_bidang AS target_bidang_kode
       FROM cross_department_requests cr
       JOIN users u ON cr.from_user_id = u.id
-      JOIN bidang fb ON cr.from_bidang_id = fb.id
+      LEFT JOIN bidang fb ON cr.from_bidang_id = fb.id
       JOIN bidang tb ON cr.target_bidang_id = tb.id
       WHERE 1=1
     `;
     const params = [];
 
     // RBAC:
-    // Staf only sees requests they submitted
-    if (role === 'STAF') {
-      query += ' AND cr.from_user_id = ?';
-      params.push(userId);
-    } else if (role === 'KABID') {
-      // Kabid sees incoming to their department OR outgoing from their department
-      query += ' AND (cr.target_bidang_id = ? OR cr.from_bidang_id = ?)';
-      params.push(userBidangId, userBidangId);
+    // Kabid sees incoming to their department OR outgoing from their department/self
+    if (role === 'KABID') {
+      query += ' AND (cr.target_bidang_id = ? OR cr.from_bidang_id = ? OR cr.from_user_id = ?)';
+      params.push(userBidangId, userBidangId, userId);
     }
     // Mudir, Wadir, Super Admin can see all
+
 
     if (status) {
       query += ' AND cr.status = ?';
@@ -190,3 +214,4 @@ module.exports = {
   getCrossRequests,
   respondCrossRequest
 };
+
