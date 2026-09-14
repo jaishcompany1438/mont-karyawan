@@ -15,8 +15,6 @@ const bidangRoutes = require('./routes/bidangRoutes');
 const taskRoutes = require('./routes/taskRoutes');
 const excelRoutes = require('./routes/excelRoutes');
 const reportRoutes = require('./routes/reportRoutes');
-const crossRequestRoutes = require('./routes/crossRequestRoutes');
-const notificationRoutes = require('./routes/notificationRoutes');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -41,8 +39,6 @@ app.use('/api/tasks', taskRoutes);
 app.use('/api/templates', excelRoutes);
 app.use('/api/import', excelRoutes);
 app.use('/api/reports', reportRoutes);
-app.use('/api/cross-requests', crossRequestRoutes);
-app.use('/api/notifications', notificationRoutes);
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {
@@ -75,35 +71,27 @@ app.use((err, req, res, next) => {
 });
 
 async function startServer() {
-  const server = app.listen(PORT, () => {
+  await initDB();
+  if (isDbConnected()) {
+    await seedData();
+    // Keep recurring task generation server-side; no frontend request is
+    // required for the next HARIAN/PEKANAN/BULANAN instance to be created.
+    const runRecurringTaskGeneration = async () => {
+      try {
+        const generated = await generateDueRecurringTasks();
+        if (generated > 0) console.log(`[Scheduler] Generated ${generated} recurring task instance(s).`);
+      } catch (error) {
+        console.error('[Scheduler] Failed to generate recurring tasks:', error.message);
+      }
+    };
+    await runRecurringTaskGeneration();
+    setInterval(runRecurringTaskGeneration, 60 * 1000).unref();
+  }
+
+  app.listen(PORT, () => {
     console.log(`[Server] PTQ Imam Ath Thobari Monitoring Karyawan running on port ${PORT}`);
     console.log(`[Server] Environment: ${process.env.NODE_ENV || 'development'}`);
   });
-
-  try {
-    await initDB();
-    if (isDbConnected()) {
-      await seedData();
-      // Keep recurring task generation server-side; no frontend request is
-      // required for the next HARIAN/PEKANAN/BULANAN instance to be created.
-      const runRecurringTaskGeneration = async () => {
-        try {
-          const generated = await generateDueRecurringTasks();
-          if (generated > 0) console.log(`[Scheduler] Generated ${generated} recurring task instance(s).`);
-        } catch (error) {
-          console.error('[Scheduler] Failed to generate recurring tasks:', error.message);
-        }
-      };
-      await runRecurringTaskGeneration();
-      setInterval(runRecurringTaskGeneration, 60 * 1000).unref();
-    }
-  } catch (error) {
-    // Keep health/static routes available while database setup is retried by a
-    // deployment restart, instead of leaving the hosting proxy waiting.
-    console.error('[Server] Database initialization failed:', error.message);
-  }
-
-  return server;
 }
 
 if (require.main === module) {
