@@ -11,7 +11,8 @@ const dbConfig = {
   port: parseInt(process.env.DB_PORT || '3306', 10),
   waitForConnections: true,
   connectionLimit: 10,
-  queueLimit: 0
+  queueLimit: 0,
+  connectTimeout: Number(process.env.DB_CONNECT_TIMEOUT || 10000)
 };
 
 let pool = null;
@@ -31,7 +32,8 @@ async function initDB() {
       host: dbConfig.host,
       user: dbConfig.user,
       password: dbConfig.password,
-      port: dbConfig.port
+      port: dbConfig.port,
+      connectTimeout: dbConfig.connectTimeout
     });
 
     await connection.query(`CREATE DATABASE IF NOT EXISTS \`${dbConfig.database}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`);

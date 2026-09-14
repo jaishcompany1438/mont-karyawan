@@ -46,6 +46,9 @@ async function createCrossRequest(req, res) {
         effectiveFromBidangId = candidateBidangId;
       }
     }
+    if (effectiveFromBidangId && Number(effectiveFromBidangId) === Number(target_bidang_id)) {
+      return res.status(400).json({ success: false, message: 'Bidang tujuan harus berbeda dari bidang asal.' });
+    }
 
     const file_attachment = req.file ? `/uploads/${req.file.filename}` : null;
 
@@ -176,7 +179,7 @@ async function respondCrossRequest(req, res) {
     // Check authority: Kabid of target_bidang_id, Mudir, Wadir, Super Admin
     const canRespond =
       ['SUPER_ADMIN', 'MUDIR', 'WAKIL_MUDIR', 'WADIR_PEND', 'WADIR_PENGS'].includes(role) ||
-      (role === 'KABID' && request.target_bidang_id === userBidangId);
+      (role === 'KABID' && Number(request.target_bidang_id) === Number(userBidangId));
 
     if (!canRespond) {
       return res.status(403).json({
@@ -185,10 +188,72 @@ async function respondCrossRequest(req, res) {
       });
     }
 
-    await db.query(
-      `UPDATE cross_department_requests SET status = ?, catatan_tanggapan = ? WHERE id = ?`,
-      [status, catatan_tanggapan || null, id]
+    if (request.status !== 'PENDING') {
+      return res.status(409).json({
+        success: false,
+        message: `Pengajuan sudah diproses dengan status ${request.status}.`
+      });
+    }
+
+    let convertedTaskId = null;
+    let targetKabidId = null;
+    if (status === 'APPROVED') {
+      const [targetKabid] = await db.query(
+        `SELECT u.id, u.nama
+         FROM users u
+         WHERE u.role = 'KABID' AND u.bidang_id = ?
+         ORDER BY u.id ASC
+         LIMIT 1`,
+        [request.target_bidang_id]
+      );
+      if (targetKabid.length === 0) {
+        return res.status(400).json({
+          success: false,
+          message: 'Bidang tujuan belum memiliki akun KABID sehingga tugas belum dapat dibuat.'
+        });
+      }
+      targetKabidId = targetKabid[0].id;
+
+      const priority = ['RENDAH', 'SEDANG', 'TINGGI', 'URGEN'].includes(request.urgensi)
+        ? request.urgensi
+        : 'SEDANG';
+      const [taskResult] = await db.query(
+        `INSERT INTO tasks (
+          judul, deskripsi, parent_role, periode, kategori, prioritas, status,
+          created_by, assigned_to, bidang_id, due_date, anggaran_dana, anggaran_terpakai,
+          file_attachment, is_recurring
+        ) VALUES (?, ?, (SELECT parent_role FROM bidang WHERE id = ?), 'TAHUNAN', 'MENDADAK', ?,
+          'TO_DO', ?, ?, ?, ?, 0, 0, ?, 0)`,
+        [
+          request.judul,
+          request.deskripsi,
+          request.target_bidang_id,
+          priority,
+          request.from_user_id,
+          targetKabidId,
+          request.target_bidang_id,
+          request.due_date,
+          request.file_attachment
+        ]
+      );
+      convertedTaskId = taskResult.insertId;
+    }
+
+    const [updated] = await db.query(
+      `UPDATE cross_department_requests
+       SET status = ?, catatan_tanggapan = ?, converted_task_id = ?
+       WHERE id = ? AND status = 'PENDING'`,
+      [status, catatan_tanggapan || null, convertedTaskId, id]
     );
+    if (updated.affectedRows !== 1) {
+      if (convertedTaskId) {
+        await db.query('DELETE FROM tasks WHERE id = ?', [convertedTaskId]);
+      }
+      return res.status(409).json({
+        success: false,
+        message: 'Pengajuan baru saja diproses oleh pengguna lain.'
+      });
+    }
 
     // Notify requester
     await createNotification({
@@ -200,9 +265,23 @@ async function respondCrossRequest(req, res) {
       referenceType: 'cross_department_requests'
     });
 
+    if (convertedTaskId) {
+      await createNotification({
+        userId: targetKabidId,
+        judul: `Tugas Lintas Bidang Baru: ${request.judul}`,
+        pesan: `${responderNama} menyetujui pengajuan tugas lintas bidang. Tugas sudah masuk ke daftar pekerjaan Anda.`,
+        tipe: 'PERINTAH_ATASAN',
+        referenceId: convertedTaskId,
+        referenceType: 'tasks'
+      });
+    }
+
     return res.json({
       success: true,
-      message: `Pengajuan berhasil ${status === 'APPROVED' ? 'disetujui' : 'ditolak'}.`
+      message: status === 'APPROVED'
+        ? 'Pengajuan disetujui dan tugas berhasil dibuat di bidang tujuan.'
+        : 'Pengajuan berhasil ditolak.',
+      data: { converted_task_id: convertedTaskId }
     });
   } catch (error) {
     return res.status(500).json({ success: false, message: 'Gagal merespons pengajuan: ' + error.message });
@@ -214,4 +293,3 @@ module.exports = {
   getCrossRequests,
   respondCrossRequest
 };
-

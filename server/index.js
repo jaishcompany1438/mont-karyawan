@@ -75,27 +75,35 @@ app.use((err, req, res, next) => {
 });
 
 async function startServer() {
-  await initDB();
-  if (isDbConnected()) {
-    await seedData();
-    // Keep recurring task generation server-side; no frontend request is
-    // required for the next HARIAN/PEKANAN/BULANAN instance to be created.
-    const runRecurringTaskGeneration = async () => {
-      try {
-        const generated = await generateDueRecurringTasks();
-        if (generated > 0) console.log(`[Scheduler] Generated ${generated} recurring task instance(s).`);
-      } catch (error) {
-        console.error('[Scheduler] Failed to generate recurring tasks:', error.message);
-      }
-    };
-    await runRecurringTaskGeneration();
-    setInterval(runRecurringTaskGeneration, 60 * 1000).unref();
-  }
-
-  app.listen(PORT, () => {
+  const server = app.listen(PORT, () => {
     console.log(`[Server] PTQ Imam Ath Thobari Monitoring Karyawan running on port ${PORT}`);
     console.log(`[Server] Environment: ${process.env.NODE_ENV || 'development'}`);
   });
+
+  try {
+    await initDB();
+    if (isDbConnected()) {
+      await seedData();
+      // Keep recurring task generation server-side; no frontend request is
+      // required for the next HARIAN/PEKANAN/BULANAN instance to be created.
+      const runRecurringTaskGeneration = async () => {
+        try {
+          const generated = await generateDueRecurringTasks();
+          if (generated > 0) console.log(`[Scheduler] Generated ${generated} recurring task instance(s).`);
+        } catch (error) {
+          console.error('[Scheduler] Failed to generate recurring tasks:', error.message);
+        }
+      };
+      await runRecurringTaskGeneration();
+      setInterval(runRecurringTaskGeneration, 60 * 1000).unref();
+    }
+  } catch (error) {
+    // Keep health/static routes available while database setup is retried by a
+    // deployment restart, instead of leaving the hosting proxy waiting.
+    console.error('[Server] Database initialization failed:', error.message);
+  }
+
+  return server;
 }
 
 if (require.main === module) {
