@@ -277,7 +277,8 @@ function parseReportDate(value) {
   return Number.isNaN(date.getTime()) ? null : date;
 }
 
-function getExpectedOccurrences(period, startDate, endDate, actualCount) {
+function getExpectedOccurrences(period, category, startDate, endDate, actualCount) {
+  if (category === 'MENDADAK') return actualCount;
   if (!startDate || !endDate || endDate < startDate) return actualCount;
   const start = new Date(startDate);
   const end = new Date(endDate);
@@ -304,6 +305,7 @@ function aggregateReportRows(rows, filters = {}) {
         judul: key,
         deskripsi: row.deskripsi || row.judul || '-',
         periode: row.periode || 'HARIAN',
+        category: row.kategori || 'RUTIN',
         frequency: 0,
         completed: 0,
         totalBudget: 0,
@@ -319,7 +321,7 @@ function aggregateReportRows(rows, filters = {}) {
   }, {});
 
   return Object.values(groups).map((group) => {
-    const target = getExpectedOccurrences(group.periode, startDate, endDate, group.frequency);
+    const target = getExpectedOccurrences(group.periode, group.category, startDate, endDate, group.frequency);
     const progress = target > 0 ? Math.min(100, Math.round((group.completed / target) * 100)) : 0;
     return {
       ...group,
@@ -337,6 +339,11 @@ function getPeriodLabel(period) {
     BULANAN: 'Bulanan',
     TAHUNAN: 'Tahunan'
   }[period] || period || '-';
+}
+
+function getReportPeriodText(row) {
+  if (row.category === 'MENDADAK') return `Sekali (${row.frequency}x)`;
+  return `${getPeriodLabel(row.periode)} (${row.frequency}x)`;
 }
 
 function getReportSummary(rows, aggregatedRows, filters) {
@@ -433,7 +440,7 @@ function createReportPdf(rows, filters) {
 
     const getRowHeight = (row) => {
       const description = row.deskripsi || row.judul || '-';
-      const period = `${getPeriodLabel(row.periode)} (${row.frequency}x)`;
+      const period = getReportPeriodText(row);
       const descriptionHeight = doc.heightOfString(description, { width: columns[0].width - 16, fontSize: 8.5 });
       const periodHeight = doc.heightOfString(period, { width: columns[1].width - 16, fontSize: 8 });
       return Math.max(31, Math.ceil(Math.max(descriptionHeight, periodHeight) + 16));
@@ -456,7 +463,7 @@ function createReportPdf(rows, filters) {
       doc.strokeColor(border).lineWidth(0.45).moveTo(margin, y + rowHeight).lineTo(margin + contentWidth, y + rowHeight).stroke();
       const values = [
         `${index + 1}. ${row.deskripsi || row.judul || '-'}`,
-        `${getPeriodLabel(row.periode)} (${row.frequency}x)`,
+        getReportPeriodText(row),
         `${row.progress}%`,
         formatPdfCurrency(row.totalSpent),
         formatPdfCurrency(row.remaining)
