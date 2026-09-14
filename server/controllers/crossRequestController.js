@@ -219,15 +219,14 @@ async function respondCrossRequest(req, res) {
         : 'SEDANG';
       const [taskResult] = await db.query(
         `INSERT INTO tasks (
-          judul, deskripsi, parent_role, periode, kategori, prioritas, status,
+          judul, deskripsi, periode, kategori, prioritas, status,
           created_by, assigned_to, bidang_id, due_date, anggaran_dana, anggaran_terpakai,
           file_attachment, is_recurring
-        ) VALUES (?, ?, (SELECT parent_role FROM bidang WHERE id = ?), 'TAHUNAN', 'MENDADAK', ?,
+        ) VALUES (?, ?, 'TAHUNAN', 'MENDADAK', ?,
           'TO_DO', ?, ?, ?, ?, 0, 0, ?, 0)`,
         [
           request.judul,
           request.deskripsi,
-          request.target_bidang_id,
           priority,
           request.from_user_id,
           targetKabidId,
