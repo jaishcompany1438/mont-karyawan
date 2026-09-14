@@ -7,7 +7,7 @@ const dbConfig = {
   host: process.env.DB_HOST || 'localhost',
   user: process.env.DB_USER || 'root',
   password: process.env.DB_PASSWORD || '',
-  database: process.env.DB_NAME || 'mon_karyawan',
+  database: process.env.DB_NAME || 'monitoring',
   port: parseInt(process.env.DB_PORT || '3306', 10),
   waitForConnections: true,
   connectionLimit: 10,
@@ -152,6 +152,7 @@ async function initDB() {
     const migrations = [
       ['bidang', 'parent_role', "ALTER TABLE bidang ADD COLUMN parent_role ENUM('WADIR_PEND','WADIR_PENGS') NULL AFTER deskripsi"],
       ['users', 'sub_bidang', 'ALTER TABLE users ADD COLUMN sub_bidang VARCHAR(100) NULL AFTER jabatan'],
+      ['tasks', 'parent_role', "ALTER TABLE tasks ADD COLUMN parent_role ENUM('WADIR_PEND','WADIR_PENGS') NULL AFTER deskripsi"],
       ['tasks', 'is_recurring', 'ALTER TABLE tasks ADD COLUMN is_recurring TINYINT(1) NOT NULL DEFAULT 0 AFTER due_date'],
       ['tasks', 'recurrence_parent_id', 'ALTER TABLE tasks ADD COLUMN recurrence_parent_id INT NULL AFTER is_recurring'],
       ['tasks', 'recurrence_generated_at', 'ALTER TABLE tasks ADD COLUMN recurrence_generated_at DATETIME NULL AFTER recurrence_parent_id'],
