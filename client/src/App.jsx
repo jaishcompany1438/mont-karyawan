@@ -12,6 +12,7 @@ import Tasks from './pages/Tasks';
 import Departments from './pages/Departments';
 import Users from './pages/Users';
 import Reports from './pages/Reports';
+import CrossRequests from './pages/CrossRequests';
 
 function AuthenticatedApp() {
   const { isAuthenticated, loading } = useAuth();
@@ -48,6 +49,7 @@ function AuthenticatedApp() {
         onOpenSubmitWork={setSubmitTask}
       />
     ),
+    'cross-requests': <CrossRequests {...pageProps} />,
     departments: <Departments {...pageProps} />,
     users: <Users {...pageProps} />,
     reports: <Reports {...pageProps} />,
@@ -62,9 +64,11 @@ function AuthenticatedApp() {
           setActiveTab={setActiveTab}
           onOpenCreateTask={() => setTaskModalOpen(true)}
           onOpenUploadExcel={() => setUploadModalOpen(true)}
+          onOpenCrossDept={() => setActiveTab('cross-requests')}
           isOpen={mobileMenuOpen}
           onClose={() => setMobileMenuOpen(false)}
         />
+
         <main className="min-w-0 flex-1 p-4 sm:p-6 lg:p-8">{page}</main>
       </div>
       <TaskModal isOpen={taskModalOpen} initialTask={editTask} onClose={() => { setTaskModalOpen(false); setEditTask(null); }} onSuccess={refresh} />

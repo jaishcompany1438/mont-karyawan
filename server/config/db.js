@@ -110,13 +110,13 @@ async function initDB() {
         status ENUM('PENDING', 'APPROVED', 'REJECTED', 'COMPLETED') NOT NULL DEFAULT 'PENDING',
         catatan_tanggapan TEXT NULL,
         from_user_id INT NOT NULL,
-        from_bidang_id INT NOT NULL,
+        from_bidang_id INT NULL,
         target_bidang_id INT NOT NULL,
         converted_task_id INT NULL,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
         FOREIGN KEY (from_user_id) REFERENCES users(id) ON DELETE CASCADE,
-        FOREIGN KEY (from_bidang_id) REFERENCES bidang(id) ON DELETE CASCADE,
+        FOREIGN KEY (from_bidang_id) REFERENCES bidang(id) ON DELETE SET NULL,
         FOREIGN KEY (target_bidang_id) REFERENCES bidang(id) ON DELETE CASCADE,
         FOREIGN KEY (converted_task_id) REFERENCES tasks(id) ON DELETE SET NULL
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
@@ -152,10 +152,10 @@ async function initDB() {
       ['users', 'sub_bidang', 'ALTER TABLE users ADD COLUMN sub_bidang VARCHAR(100) NULL AFTER jabatan'],
       ['tasks', 'is_recurring', 'ALTER TABLE tasks ADD COLUMN is_recurring TINYINT(1) NOT NULL DEFAULT 0 AFTER due_date'],
       ['tasks', 'recurrence_parent_id', 'ALTER TABLE tasks ADD COLUMN recurrence_parent_id INT NULL AFTER is_recurring'],
-      ['tasks', 'recurrence_generated_at', 'ALTER TABLE tasks ADD COLUMN recurrence_generated_at DATETIME NULL AFTER recurrence_parent_id']
-      ,['users', 'no_telepon', 'ALTER TABLE users ADD COLUMN no_telepon VARCHAR(30) NULL AFTER sub_bidang']
-      ,['tasks', 'anggaran_dana', 'ALTER TABLE tasks ADD COLUMN anggaran_dana DECIMAL(15,2) NOT NULL DEFAULT 0 AFTER due_date']
-      ,['tasks', 'anggaran_terpakai', 'ALTER TABLE tasks ADD COLUMN anggaran_terpakai DECIMAL(15,2) NOT NULL DEFAULT 0 AFTER anggaran_dana']
+      ['tasks', 'recurrence_generated_at', 'ALTER TABLE tasks ADD COLUMN recurrence_generated_at DATETIME NULL AFTER recurrence_parent_id'],
+      ['users', 'no_telepon', 'ALTER TABLE users ADD COLUMN no_telepon VARCHAR(30) NULL AFTER sub_bidang'],
+      ['tasks', 'anggaran_dana', 'ALTER TABLE tasks ADD COLUMN anggaran_dana DECIMAL(15,2) NOT NULL DEFAULT 0 AFTER due_date'],
+      ['tasks', 'anggaran_terpakai', 'ALTER TABLE tasks ADD COLUMN anggaran_terpakai DECIMAL(15,2) NOT NULL DEFAULT 0 AFTER anggaran_dana']
     ];
     for (const [table, column, statement] of migrations) {
       const [columns] = await db.query(
@@ -164,6 +164,31 @@ async function initDB() {
       );
       if (!columns[0].present) await db.query(statement);
     }
+
+    // Auto-migration for cross_department_requests from_bidang_id to be nullable
+    try {
+      const [crossTableCol] = await db.query(
+        `SELECT IS_NULLABLE FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'cross_department_requests' AND column_name = 'from_bidang_id'`
+      );
+      if (crossTableCol.length > 0 && crossTableCol[0].IS_NULLABLE === 'NO') {
+        const [fks] = await db.query(`
+          SELECT CONSTRAINT_NAME FROM information_schema.KEY_COLUMN_USAGE 
+          WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'cross_department_requests' AND COLUMN_NAME = 'from_bidang_id' AND REFERENCED_TABLE_NAME = 'bidang'
+        `);
+        for (const fk of fks) {
+          try {
+            await db.query(`ALTER TABLE cross_department_requests DROP FOREIGN KEY \`${fk.CONSTRAINT_NAME}\``);
+          } catch (e) {}
+        }
+        await db.query(`ALTER TABLE cross_department_requests MODIFY COLUMN from_bidang_id INT NULL`);
+        try {
+          await db.query(`ALTER TABLE cross_department_requests ADD CONSTRAINT fk_cdr_from_bidang FOREIGN KEY (from_bidang_id) REFERENCES bidang(id) ON DELETE SET NULL`);
+        } catch (e) {}
+      }
+    } catch (err) {
+      console.warn('[Migration cross_department_requests]:', err.message);
+    }
+
     // ALTER ENUMs rather than recreating users, preserving all existing data.
     await db.query("ALTER TABLE users MODIFY COLUMN role ENUM('SUPER_ADMIN','MUDIR','WAKIL_MUDIR','WADIR_PEND','WADIR_PENGS','KABID','STAF') NOT NULL");
     // A period is the recurrence declaration for legacy periodic tasks.

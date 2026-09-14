@@ -8,7 +8,8 @@ import {
   Users,
   PlusCircle,
   Upload,
-  FileDown
+  FileDown,
+  ArrowRightLeft
 } from 'lucide-react';
 
 export default function Sidebar({
@@ -16,6 +17,7 @@ export default function Sidebar({
   setActiveTab,
   onOpenCreateTask,
   onOpenUploadExcel,
+  onOpenCrossDept,
   isOpen,
   onClose
 }) {
@@ -25,12 +27,18 @@ export default function Sidebar({
   const canCreateTask = ['SUPER_ADMIN', 'MUDIR', 'WADIR_PEND', 'WADIR_PENGS', 'KABID'].includes(role);
   const canManageBidang = ['SUPER_ADMIN', 'MUDIR'].includes(role);
   const canManageUsers = ['SUPER_ADMIN', 'MUDIR'].includes(role);
+  // Setiap bidang bisa mengakses kecuali bawahan bidang (STAF)
+  const canAccessCrossDept = role && role !== 'STAF';
 
   const navItems = [
     { id: 'dashboard', label: 'Dashboard Utama', icon: LayoutDashboard },
     { id: 'tasks', label: 'Manajemen Tugas', icon: CheckSquare },
     { id: 'reports', label: 'Laporan & Rekap', icon: FileSpreadsheet },
   ];
+
+  if (canAccessCrossDept) {
+    navItems.push({ id: 'cross-requests', label: 'Tugas Lintas Bidang', icon: ArrowRightLeft });
+  }
 
   if (canManageBidang) {
     navItems.push({ id: 'departments', label: 'Struktur Bidang', icon: Building });
@@ -87,7 +95,22 @@ export default function Sidebar({
               <span>Import via Excel</span>
             </button>
           )}
+
+          {canAccessCrossDept && (
+            <button
+              onClick={() => {
+                if (onClose) onClose();
+                setActiveTab('cross-requests');
+                if (onOpenCrossDept) onOpenCrossDept();
+              }}
+              className="w-full flex items-center justify-center space-x-2 bg-indigo-600 hover:bg-indigo-500 text-white font-medium py-2 px-4 rounded-xl shadow-md shadow-indigo-900/30 transition-all text-xs"
+            >
+              <ArrowRightLeft className="w-3.5 h-3.5" />
+              <span>+ Pengajuan Antar Bidang</span>
+            </button>
+          )}
         </div>
+
 
         {/* Navigation Menu */}
         <nav className="flex-1 p-3 space-y-1 overflow-y-auto">
