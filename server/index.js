@@ -21,19 +21,16 @@ const notificationRoutes = require('./routes/notificationRoutes');
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-// Middlewares
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Static uploads folder
 const uploadDir = path.join(__dirname, '../uploads');
 if (!fs.existsSync(uploadDir)) {
   fs.mkdirSync(uploadDir, { recursive: true });
 }
 app.use('/uploads', express.static(uploadDir));
 
-// API Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/bidang', bidangRoutes);
@@ -44,7 +41,6 @@ app.use('/api/reports', reportRoutes);
 app.use('/api/cross-requests', crossRequestRoutes);
 app.use('/api/notifications', notificationRoutes);
 
-// Health check endpoint
 app.get('/api/health', (req, res) => {
   res.json({
     status: 'ok',
@@ -54,7 +50,6 @@ app.get('/api/health', (req, res) => {
   });
 });
 
-// Serve frontend build if exists (for Hostinger and production single-server mode)
 const clientBuildPath = path.join(__dirname, '../client/dist');
 if (fs.existsSync(clientBuildPath)) {
   app.use(express.static(clientBuildPath));
@@ -65,7 +60,6 @@ if (fs.existsSync(clientBuildPath)) {
   });
 }
 
-// Global error handler
 app.use((err, req, res, next) => {
   console.error('[Server Error]:', err);
   res.status(500).json({
@@ -84,8 +78,6 @@ async function startServer() {
     await initDB();
     if (isDbConnected()) {
       await seedData();
-      // Keep recurring task generation server-side; no frontend request is
-      // required for the next HARIAN/PEKANAN/BULANAN instance to be created.
       const runRecurringTaskGeneration = async () => {
         try {
           const generated = await generateDueRecurringTasks();
@@ -98,8 +90,6 @@ async function startServer() {
       setInterval(runRecurringTaskGeneration, 60 * 1000).unref();
     }
   } catch (error) {
-    // Keep health/static routes available while database setup is retried by a
-    // deployment restart, instead of leaving the hosting proxy waiting.
     console.error('[Server] Database initialization failed:', error.message);
   }
 
