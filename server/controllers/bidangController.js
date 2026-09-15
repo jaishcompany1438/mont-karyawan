@@ -12,14 +12,23 @@ async function getAllBidang(req, res) {
       : (req.user.role === 'WAKIL_MUDIR' && ['WADIR_PEND', 'WADIR_PENGS'].includes(req.user.parent_role)
         ? req.user.parent_role
         : null);
-    const [rows] = await db.query(`
+    let query = `
       SELECT b.*,
              (SELECT COUNT(*) FROM users u WHERE u.bidang_id = b.id) AS total_karyawan,
              (SELECT COUNT(*) FROM tasks t WHERE t.bidang_id = b.id AND t.status != 'COMPLETED') AS active_tasks
       FROM bidang b
-      WHERE (? IS NULL OR b.parent_role = ?)
-      ORDER BY b.nama_bidang ASC
-    `, [branchRole, branchRole]);
+      WHERE 1=1
+    `;
+    const params = [];
+    if (branchRole) {
+      query += ' AND b.parent_role = ?';
+      params.push(branchRole);
+    } else if (['KABID', 'STAF'].includes(req.user.role)) {
+      query += ' AND b.id = ?';
+      params.push(req.user.bidang_id || 0);
+    }
+    query += ' ORDER BY b.nama_bidang ASC';
+    const [rows] = await db.query(query, params);
 
     return res.json({ success: true, data: rows });
   } catch (error) {

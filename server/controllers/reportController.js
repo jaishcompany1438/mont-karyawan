@@ -302,7 +302,7 @@ function aggregateReportRows(rows, filters = {}) {
     if (!result[key]) {
       result[key] = {
         judul: key,
-        deskripsi: row.deskripsi || row.judul || '-',
+        deskripsi: row.judul || row.deskripsi || '-',
         periode: row.periode || 'HARIAN',
         frequency: 0,
         completed: 0,
@@ -432,7 +432,7 @@ function createReportPdf(rows, filters) {
     };
 
     const getRowHeight = (row) => {
-      const description = row.deskripsi || row.judul || '-';
+      const description = row.judul || row.deskripsi || '-';
       const period = `${getPeriodLabel(row.periode)} (${row.frequency}x)`;
       const descriptionHeight = doc.heightOfString(description, { width: columns[0].width - 16, fontSize: 8.5 });
       const periodHeight = doc.heightOfString(period, { width: columns[1].width - 16, fontSize: 8 });
@@ -455,7 +455,7 @@ function createReportPdf(rows, filters) {
       }
       doc.strokeColor(border).lineWidth(0.45).moveTo(margin, y + rowHeight).lineTo(margin + contentWidth, y + rowHeight).stroke();
       const values = [
-        `${index + 1}. ${row.deskripsi || row.judul || '-'}`,
+        `${index + 1}. ${row.judul || row.deskripsi ||  '-'}`,
         `${getPeriodLabel(row.periode)} (${row.frequency}x)`,
         `${row.progress}%`,
         formatPdfCurrency(row.totalSpent),
