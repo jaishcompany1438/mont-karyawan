@@ -462,7 +462,7 @@ function createReportPdf(rows, filters) {
       }
       doc.strokeColor(border).lineWidth(0.45).moveTo(margin, y + rowHeight).lineTo(margin + contentWidth, y + rowHeight).stroke();
       const values = [
-        `${index + 1}. ${row.deskripsi || row.judul || '-'}`,
+        `${index + 1}. ${row.judul || row.deskripsi || '-'}`,
         getReportPeriodText(row),
         `${row.progress}%`,
         formatPdfCurrency(row.totalSpent),
