@@ -403,7 +403,7 @@ function createReportPdf(rows, filters) {
       doc.fillColor(muted).font('Helvetica').fontSize(9)
         .text(`Periode: ${filters.start_date || '-'} s/d ${filters.end_date || '-'}`, textX, y + 43);
       y += 78;
-      doc.fillColor(muted).font('Helvetica-Bold').fontSize(9).text('KABID :', margin, y);
+      doc.fillColor(muted).font('Helvetica-Bold').fontSize(9).text('Laporan Ini Milik :', margin, y);
       doc.fillColor('#0F172A').font('Helvetica').fontSize(11).text(bidangName, margin, y + 14);
       return y + 42;
     };
