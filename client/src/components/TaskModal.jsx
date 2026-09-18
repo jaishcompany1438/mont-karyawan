@@ -13,6 +13,12 @@ export default function TaskModal({ isOpen, onClose, onSuccess, initialTask = nu
   const [isRecurring, setIsRecurring] = useState(true);
   const [anggaranDana, setAnggaranDana] = useState('0');
   const [attachment, setAttachment] = useState(null);
+  const [holidayExclusions, setHolidayExclusions] = useState([]);
+  const [holidayDate, setHolidayDate] = useState('');
+  const holidayOptions = [
+    ['SATURDAY', 'Sabtu'],
+    ['SUNDAY', 'Minggu']
+  ];
 
   const [assignees, setAssignees] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -30,6 +36,11 @@ export default function TaskModal({ isOpen, onClose, onSuccess, initialTask = nu
         setAssignedTo(initialTask.assigned_to || '');
         setIsRecurring(Boolean(initialTask.is_recurring));
         setAnggaranDana(String(initialTask.anggaran_dana ?? 0));
+        try {
+          setHolidayExclusions(initialTask.libur_pengecualian ? JSON.parse(initialTask.libur_pengecualian) : []);
+        } catch {
+          setHolidayExclusions([]);
+        }
         if (initialTask.due_date) {
           const date = new Date(initialTask.due_date);
           setDueDate(date.toISOString().slice(0, 16));
@@ -49,6 +60,8 @@ export default function TaskModal({ isOpen, onClose, onSuccess, initialTask = nu
         setAttachment(null);
         setIsRecurring(true);
         setAnggaranDana('0');
+        setHolidayExclusions([]);
+        setHolidayDate('');
       }
       setError('');
     }
@@ -91,6 +104,7 @@ export default function TaskModal({ isOpen, onClose, onSuccess, initialTask = nu
       formData.append('due_date', dueDate);
       formData.append('is_recurring', isRecurring ? '1' : '0');
       formData.append('anggaran_dana', anggaranDana);
+      formData.append('libur_pengecualian', JSON.stringify(holidayExclusions));
 
       if (attachment) {
         formData.append('attachment', attachment);
@@ -211,6 +225,38 @@ export default function TaskModal({ isOpen, onClose, onSuccess, initialTask = nu
               </select>
             </div>
           </div>
+
+          {['HARIAN', 'PEKANAN', 'BULANAN'].includes(periode) && (
+            <div className="rounded-xl border border-amber-200 bg-amber-50/60 p-3">
+              <label className="block font-bold text-amber-900 mb-2">Pengecualian Hari Libur</label>
+              <div className="flex flex-wrap gap-3">
+                {holidayOptions.map(([value, label]) => (
+                  <label key={value} className="inline-flex items-center gap-2 text-amber-900">
+                    <input
+                      type="checkbox"
+                      checked={holidayExclusions.includes(value)}
+                      onChange={(e) => setHolidayExclusions((current) => e.target.checked
+                        ? [...current, value]
+                        : current.filter((item) => item !== value))}
+                      className="h-4 w-4 accent-amber-600"
+                    />
+                    {label}
+                  </label>
+                ))}
+              </div>
+              <div className="mt-2 flex gap-2">
+                <input type="date" value={holidayDate} onChange={(e) => setHolidayDate(e.target.value)} className="rounded-lg border px-2 py-1.5 text-xs" />
+                <button type="button" onClick={() => {
+                  if (holidayDate && !holidayExclusions.includes(holidayDate)) setHolidayExclusions((current) => [...current, holidayDate]);
+                  setHolidayDate('');
+                }} className="rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-bold text-white">Tambah tanggal</button>
+              </div>
+              {holidayExclusions.filter((item) => /^\d{4}-\d{2}-\d{2}$/.test(item)).length > 0 && (
+                <p className="mt-2 text-[10px] text-amber-800">Tanggal khusus: {holidayExclusions.filter((item) => /^\d{4}-\d{2}-\d{2}$/.test(item)).join(', ')}</p>
+              )}
+              <p className="mt-1 text-[10px] text-amber-800">Instance berulang akan dilewati jika jatuh pada pilihan di atas.</p>
+            </div>
+          )}
 
           {/* Assignee & Due Date */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">

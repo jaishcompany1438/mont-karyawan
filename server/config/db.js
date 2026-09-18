@@ -64,6 +64,7 @@ async function initDB() {
         jabatan VARCHAR(100) NULL,
         sub_bidang VARCHAR(100) NULL,
         no_telepon VARCHAR(30) NULL,
+        can_patroli TINYINT(1) NOT NULL DEFAULT 0,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (bidang_id) REFERENCES bidang(id) ON DELETE SET NULL
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
@@ -92,6 +93,11 @@ async function initDB() {
         file_attachment VARCHAR(255) NULL,
         bukti_kerja VARCHAR(255) NULL,
         catatan_revisi TEXT NULL,
+        catatan_reviewer TEXT NULL,
+        nilai_sop DECIMAL(3,1) NULL,
+        nilai_waktu DECIMAL(3,1) NULL,
+        nilai_kualitas DECIMAL(3,1) NULL,
+        libur_pengecualian TEXT NULL,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
         FOREIGN KEY (created_by) REFERENCES users(id),
@@ -158,12 +164,63 @@ async function initDB() {
       ['tasks', 'recurrence_generated_at', 'ALTER TABLE tasks ADD COLUMN recurrence_generated_at DATETIME NULL AFTER recurrence_parent_id'],
       ['users', 'no_telepon', 'ALTER TABLE users ADD COLUMN no_telepon VARCHAR(30) NULL AFTER sub_bidang'],
       ['tasks', 'anggaran_dana', 'ALTER TABLE tasks ADD COLUMN anggaran_dana DECIMAL(15,2) NOT NULL DEFAULT 0 AFTER due_date'],
-      ['tasks', 'anggaran_terpakai', 'ALTER TABLE tasks ADD COLUMN anggaran_terpakai DECIMAL(15,2) NOT NULL DEFAULT 0 AFTER anggaran_dana']
+      ['tasks', 'anggaran_terpakai', 'ALTER TABLE tasks ADD COLUMN anggaran_terpakai DECIMAL(15,2) NOT NULL DEFAULT 0 AFTER anggaran_dana'],
+      ['tasks', 'catatan_reviewer', 'ALTER TABLE tasks ADD COLUMN catatan_reviewer TEXT NULL AFTER catatan_revisi'],
+      ['tasks', 'nilai_sop', 'ALTER TABLE tasks ADD COLUMN nilai_sop DECIMAL(3,1) NULL AFTER catatan_reviewer'],
+      ['tasks', 'nilai_waktu', 'ALTER TABLE tasks ADD COLUMN nilai_waktu DECIMAL(3,1) NULL AFTER nilai_sop'],
+      ['tasks', 'nilai_kualitas', 'ALTER TABLE tasks ADD COLUMN nilai_kualitas DECIMAL(3,1) NULL AFTER nilai_waktu'],
+      ['tasks', 'libur_pengecualian', 'ALTER TABLE tasks ADD COLUMN libur_pengecualian TEXT NULL AFTER nilai_kualitas']
+      ,['users', 'can_patroli', 'ALTER TABLE users ADD COLUMN can_patroli TINYINT(1) NOT NULL DEFAULT 0 AFTER no_telepon']
     ];
     for (const [table, column, statement] of migrations) {
       const [columns] = await db.query(
         `SELECT COUNT(*) AS present FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = ? AND column_name = ?`,
         [table, column]
+      );
+      if (!columns[0].present) await db.query(statement);
+    }
+
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS patroli_ruangan (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        nama_ruangan VARCHAR(150) NOT NULL UNIQUE,
+        is_active TINYINT(1) NOT NULL DEFAULT 1,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    `);
+
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS patroli (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        user_id INT NOT NULL,
+        ruangan VARCHAR(150) NOT NULL,
+        tanggal DATE NOT NULL,
+        nilai_kebersihan VARCHAR(20) NOT NULL,
+        nilai_kerapihan VARCHAR(20) NOT NULL,
+        nilai_sarpras VARCHAR(20) NOT NULL,
+        nilai_ketertiban VARCHAR(20) NOT NULL,
+        skor_kebersihan DECIMAL(2,1) NOT NULL DEFAULT 0,
+        skor_kerapihan DECIMAL(2,1) NOT NULL DEFAULT 0,
+        skor_sarpras DECIMAL(2,1) NOT NULL DEFAULT 0,
+        skor_ketertiban DECIMAL(2,1) NOT NULL DEFAULT 0,
+        catatan_temuan TEXT NULL,
+        foto_bukti VARCHAR(255) NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+        INDEX idx_patroli_tanggal (tanggal),
+        INDEX idx_patroli_user (user_id)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    `);
+    const patrolMigrations = [
+      ['skor_kebersihan', 'ALTER TABLE patroli ADD COLUMN skor_kebersihan DECIMAL(2,1) NOT NULL DEFAULT 0 AFTER nilai_ketertiban'],
+      ['skor_kerapihan', 'ALTER TABLE patroli ADD COLUMN skor_kerapihan DECIMAL(2,1) NOT NULL DEFAULT 0 AFTER skor_kebersihan'],
+      ['skor_sarpras', 'ALTER TABLE patroli ADD COLUMN skor_sarpras DECIMAL(2,1) NOT NULL DEFAULT 0 AFTER skor_kerapihan'],
+      ['skor_ketertiban', 'ALTER TABLE patroli ADD COLUMN skor_ketertiban DECIMAL(2,1) NOT NULL DEFAULT 0 AFTER skor_sarpras']
+    ];
+    for (const [column, statement] of patrolMigrations) {
+      const [columns] = await db.query(
+        `SELECT COUNT(*) AS present FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'patroli' AND column_name = ?`,
+        [column]
       );
       if (!columns[0].present) await db.query(statement);
     }
@@ -215,6 +272,23 @@ function addPeriod(date, periode) {
     return next;
   }
 
+function isHoliday(date, exclusions) {
+  let values = [];
+  try {
+    values = Array.isArray(exclusions) ? exclusions : JSON.parse(exclusions || '[]');
+  } catch (error) {
+    console.warn('[Recurring task holidays] Invalid exclusion configuration:', error.message);
+  }
+  if (!Array.isArray(values)) return false;
+  const dateKey = [
+    date.getFullYear(),
+    String(date.getMonth() + 1).padStart(2, '0'),
+    String(date.getDate()).padStart(2, '0')
+  ].join('-');
+  const weekday = ['SUNDAY', 'MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY'][date.getDay()];
+  return values.includes(dateKey) || values.map((value) => String(value).toUpperCase()).includes(weekday);
+}
+
   // Creates one next instance per due periodic task. The source is marked in the
   // same transaction so repeated scheduler runs cannot duplicate an instance.
 async function generateDueRecurringTasks() {
@@ -233,18 +307,23 @@ async function generateDueRecurringTasks() {
         FOR UPDATE
       `);
       for (const task of dueTasks) {
-        const nextDue = addPeriod(task.due_date, task.periode);
+        let nextDue = addPeriod(task.due_date, task.periode);
+        // Advance past every configured holiday so a scheduler run never creates
+        // an instance on an excluded date.
+        while (isHoliday(nextDue, task.libur_pengecualian)) {
+          nextDue = addPeriod(nextDue, task.periode);
+        }
         const [result] = await connection.query(`
           INSERT INTO tasks (
             judul, deskripsi, periode, kategori, prioritas, status,
             created_by, assigned_to, bidang_id, due_date, anggaran_dana, anggaran_terpakai, file_attachment,
-            is_recurring, recurrence_parent_id
-          ) VALUES (?, ?, ?, ?, ?, 'TO_DO', ?, ?, ?, ?, ?, 0, ?, 1, ?)
+            is_recurring, recurrence_parent_id, libur_pengecualian
+          ) VALUES (?, ?, ?, ?, ?, 'TO_DO', ?, ?, ?, ?, ?, 0, ?, 1, ?, ?)
         `, [
           task.judul, task.deskripsi, task.periode, task.kategori, task.prioritas,
           task.created_by, task.assigned_to, task.bidang_id, nextDue,
           task.anggaran_dana,
-          task.file_attachment, task.recurrence_parent_id || task.id
+          task.file_attachment, task.recurrence_parent_id || task.id, task.libur_pengecualian
         ]);
         await connection.query(
           'UPDATE tasks SET recurrence_generated_at = NOW() WHERE id = ?',

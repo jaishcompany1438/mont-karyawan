@@ -6,6 +6,33 @@ function recurringFlag(value, defaultValue) {
   return ['1', 'true', 'ya', 'y', 'yes'].includes(String(value).toLowerCase()) ? 1 : 0;
 }
 
+function parseHolidayExclusions(value) {
+  if (value === undefined || value === null || value === '') return [];
+  let parsed = value;
+  if (typeof value === 'string') {
+    try {
+      parsed = JSON.parse(value);
+    } catch (error) {
+      parsed = value.split(',').map((item) => item.trim()).filter(Boolean);
+    }
+  }
+  if (!Array.isArray(parsed)) throw new Error('Pengecualian hari libur harus berupa array.');
+  const allowedWeekdays = ['SUNDAY', 'MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY'];
+  const values = parsed.map((item) => String(item).trim().toUpperCase()).filter(Boolean);
+  if (values.some((item) => !allowedWeekdays.includes(item) && !/^\d{4}-\d{2}-\d{2}$/.test(item))) {
+    throw new Error('Format pengecualian hari libur tidak valid.');
+  }
+  return [...new Set(values)];
+}
+
+function parseRating(value, label) {
+  const rating = Number(value);
+  if (!Number.isFinite(rating) || rating < 1 || rating > 5) {
+    throw new Error(`${label} harus bernilai antara 1 sampai 5.`);
+  }
+  return Math.round(rating * 10) / 10;
+}
+
 // GET /api/tasks
 async function getTasks(req, res) {
   try {
@@ -167,7 +194,8 @@ async function createTask(req, res) {
       bidang_id,
       due_date,
       is_recurring,
-      anggaran_dana
+      anggaran_dana,
+      libur_pengecualian
     } = req.body;
     if (!judul || !assigned_to || !due_date || anggaran_dana === undefined || anggaran_dana === null || anggaran_dana === '') {
       return res.status(400).json({
@@ -179,6 +207,12 @@ async function createTask(req, res) {
     if (!Number.isFinite(budget) || budget < 0) return res.status(400).json({ success: false, message: 'Anggaran dana harus berupa angka nol atau lebih.' });
 
     const db = getPool();
+    let holidayExclusions;
+    try {
+      holidayExclusions = parseHolidayExclusions(libur_pengecualian);
+    } catch (error) {
+      return res.status(400).json({ success: false, message: error.message });
+    }
 
     // Verify assignee and RBAC hierarchy (PRD 3.4)
     const [assigneeRows] = await db.query('SELECT id, role, bidang_id FROM users WHERE id = ?', [assigned_to]);
@@ -223,8 +257,8 @@ async function createTask(req, res) {
     const [result] = await db.query(
       `INSERT INTO tasks (
         judul, deskripsi, periode, kategori, prioritas, status,
-        created_by, assigned_to, bidang_id, due_date, anggaran_dana, anggaran_terpakai, file_attachment, is_recurring
-      ) VALUES (?, ?, ?, ?, ?, 'TO_DO', ?, ?, ?, ?, ?, 0, ?, ?)`,
+        created_by, assigned_to, bidang_id, due_date, anggaran_dana, anggaran_terpakai, file_attachment, is_recurring, libur_pengecualian
+      ) VALUES (?, ?, ?, ?, ?, 'TO_DO', ?, ?, ?, ?, ?, 0, ?, ?, ?)`,
       [
         judul.trim(),
         deskripsi || null,
@@ -240,7 +274,8 @@ async function createTask(req, res) {
         recurringFlag(
           is_recurring,
           ['HARIAN', 'PEKANAN', 'BULANAN'].includes(String(periode).toUpperCase()) ? 1 : 0
-        )
+        ),
+        JSON.stringify(holidayExclusions)
       ]
     );
 
@@ -300,11 +335,20 @@ async function updateTask(req, res) {
       bidang_id,
       due_date,
       is_recurring
-      ,anggaran_dana
+      ,anggaran_dana,
+      libur_pengecualian
     } = req.body;
     const nextBudget = Number(anggaran_dana !== undefined ? anggaran_dana : task.anggaran_dana);
     if (!Number.isFinite(nextBudget) || nextBudget < 0 || nextBudget < Number(task.anggaran_terpakai || 0)) {
       return res.status(400).json({ success: false, message: 'Anggaran dana tidak valid atau lebih kecil dari anggaran terpakai.' });
+    }
+    let holidayExclusions;
+    try {
+      holidayExclusions = parseHolidayExclusions(
+        libur_pengecualian !== undefined ? libur_pengecualian : task.libur_pengecualian
+      );
+    } catch (error) {
+      return res.status(400).json({ success: false, message: error.message });
     }
     if (role === 'WADIR_PEND' || role === 'WADIR_PENGS') {
       const [candidate] = await db.query(
@@ -322,7 +366,7 @@ async function updateTask(req, res) {
       `UPDATE tasks SET
         judul = ?, deskripsi = ?, periode = ?, kategori = ?, prioritas = ?,
         status = ?, assigned_to = ?, bidang_id = ?, due_date = ?, anggaran_dana = ?, file_attachment = ?,
-        is_recurring = ?, recurrence_generated_at = NULL
+        is_recurring = ?, libur_pengecualian = ?, recurrence_generated_at = NULL
        WHERE id = ?`,
       [
         judul || task.judul,
@@ -337,6 +381,7 @@ async function updateTask(req, res) {
         nextBudget,
         file_attachment,
         recurringFlag(is_recurring, task.is_recurring),
+        JSON.stringify(holidayExclusions),
         id
       ]
     );
@@ -437,7 +482,7 @@ async function submitReview(req, res) {
 async function reviewTask(req, res) {
   try {
     const { id } = req.params;
-    const { action, catatan_revisi } = req.body; // action: 'APPROVE' or 'REJECT'
+    const { action, catatan_revisi, nilai_sop, nilai_waktu, nilai_kualitas, catatan_reviewer } = req.body; // action: 'APPROVE' or 'REJECT'
     const { id: userId, role, bidang_id: userBidangId } = req.user;
 
     if (!['APPROVE', 'REJECT'].includes(action)) {
@@ -446,6 +491,16 @@ async function reviewTask(req, res) {
 
     if (action === 'REJECT' && (!catatan_revisi || catatan_revisi.trim().length === 0)) {
       return res.status(400).json({ success: false, message: 'Catatan revisi wajib diisi jika tugas ditolak/revisi.' });
+    }
+    let ratings;
+    try {
+      ratings = {
+        sop: parseRating(nilai_sop, 'Nilai SOP'),
+        waktu: parseRating(nilai_waktu, 'Nilai waktu'),
+        kualitas: parseRating(nilai_kualitas, 'Nilai kualitas')
+      };
+    } catch (error) {
+      return res.status(400).json({ success: false, message: error.message });
     }
 
     const db = getPool();
@@ -476,8 +531,8 @@ async function reviewTask(req, res) {
     const notes = action === 'REJECT' ? catatan_revisi.trim() : null;
 
     await db.query(
-      `UPDATE tasks SET status = ?, catatan_revisi = ? WHERE id = ?`,
-      [newStatus, notes, id]
+      `UPDATE tasks SET status = ?, catatan_revisi = ?, catatan_reviewer = ?, nilai_sop = ?, nilai_waktu = ?, nilai_kualitas = ? WHERE id = ?`,
+      [newStatus, notes, catatan_reviewer && catatan_reviewer.trim() ? catatan_reviewer.trim() : null, ratings.sop, ratings.waktu, ratings.kualitas, id]
     );
 
     // Notify assignee

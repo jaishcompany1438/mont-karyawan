@@ -131,7 +131,10 @@ async function getReportRows(req) {
              creator.nama AS creator_nama,
              assignee.nama AS assignee_nama, assignee.email AS assignee_email, assignee.no_telepon AS assignee_no_telepon,
              assignee.jabatan AS assignee_jabatan, assignee.sub_bidang AS assignee_sub_bidang,
-             b.nama_bidang, b.kode_bidang
+             b.nama_bidang, b.kode_bidang,
+             t.deskripsi AS catatan_tugas,
+             t.catatan_reviewer,
+             t.nilai_sop, t.nilai_waktu, t.nilai_kualitas
       FROM tasks t
       JOIN users creator ON t.created_by = creator.id
       JOIN users assignee ON t.assigned_to = assignee.id
@@ -162,7 +165,10 @@ async function getReportRows(req) {
       query += ' AND t.status = ?';
       params.push(status);
     }
-    if (filterBidangId) {
+    if (role === 'KABID') {
+      query += ' AND t.bidang_id = ?';
+      params.push(bidang_id);
+    } else if (filterBidangId) {
       query += ' AND t.bidang_id = ?';
       params.push(filterBidangId);
     }
@@ -309,7 +315,10 @@ function aggregateReportRows(rows, filters = {}) {
         frequency: 0,
         completed: 0,
         totalBudget: 0,
-        totalSpent: 0
+        totalSpent: 0,
+        taskNotes: [],
+        reviewerNotes: [],
+        ratings: []
       };
     }
     const group = result[key];
@@ -317,6 +326,13 @@ function aggregateReportRows(rows, filters = {}) {
     if (['COMPLETED', 'DONE'].includes(row.status)) group.completed += 1;
     group.totalBudget += Number(row.anggaran_dana || 0);
     group.totalSpent += Number(row.anggaran_terpakai || 0);
+    const taskNote = String(row.catatan_tugas || row.deskripsi || '').trim();
+    const reviewerNote = String(row.catatan_reviewer || row.catatan_revisi || '').trim();
+    if (taskNote) group.taskNotes.push(taskNote);
+    if (reviewerNote) group.reviewerNotes.push(reviewerNote);
+    [row.nilai_sop, row.nilai_waktu, row.nilai_kualitas].forEach((value) => {
+      if (value !== null && value !== undefined && value !== '') group.ratings.push(Number(value));
+    });
     return result;
   }, {});
 
@@ -327,7 +343,12 @@ function aggregateReportRows(rows, filters = {}) {
       ...group,
       target,
       progress,
-      remaining: group.totalBudget - group.totalSpent
+      remaining: group.totalBudget - group.totalSpent,
+      catatan_tugas: [...new Set(group.taskNotes)].slice(-3).join('\n- '),
+      catatan_reviewer: [...new Set(group.reviewerNotes)].slice(-3).join('\n- '),
+      penilaian: group.ratings.length
+        ? (group.ratings.reduce((sum, value) => sum + value, 0) / group.ratings.length).toFixed(1)
+        : '-'
     };
   });
 }
@@ -360,15 +381,33 @@ function getReportSummary(rows, aggregatedRows, filters) {
 }
 
 function createReportPdf(rows, filters) {
+  const selected = String(filters.selected_columns || 'judul,periode')
+    .split(',')
+    .map((column) => column.trim())
+    .filter(Boolean);
+  const allowedColumns = ['judul', 'periode', 'progress', 'total_anggaran', 'sisa_saldo', 'catatan_tugas', 'catatan_reviewer', 'penilaian'];
+  const selectedColumns = [...new Set(['judul', 'periode', ...selected.filter((column) => allowedColumns.includes(column))])];
+  const columnDefinitions = {
+    judul: { label: 'Judul Tugas', width: 190, value: (row, index) => `${index + 1}. ${row.judul || '-'}` },
+    periode: { label: 'Periode', width: 100, value: (row) => getReportPeriodText(row) },
+    progress: { label: 'Progress', width: 58, value: (row) => `${row.progress}%`, align: 'right' },
+    total_anggaran: { label: 'Total Anggaran', width: 92, value: (row) => formatPdfCurrency(row.totalBudget), align: 'right' },
+    sisa_saldo: { label: 'Sisa Saldo', width: 92, value: (row) => formatPdfCurrency(row.remaining), align: 'right' },
+    catatan_tugas: { label: 'Catatan Tugas', width: 130, value: (row) => row.catatan_tugas || '-' },
+    catatan_reviewer: { label: 'Catatan Reviewer', width: 130, value: (row) => row.catatan_reviewer || '-' },
+    penilaian: { label: 'Penilaian', width: 65, value: (row) => row.penilaian || '-', align: 'right' }
+  };
+  const estimatedWidth = selectedColumns.reduce((sum, key) => sum + columnDefinitions[key].width, 0);
+  const landscape = estimatedWidth > 515;
   return new Promise((resolve, reject) => {
-    const doc = new PDFDocument({ size: 'A4', margin: 0, bufferPages: true, autoFirstPage: false });
+    const doc = new PDFDocument({ size: 'A4', layout: landscape ? 'landscape' : 'portrait', margin: 0, bufferPages: true, autoFirstPage: false });
     const chunks = [];
     doc.on('data', (chunk) => chunks.push(chunk));
     doc.on('end', () => resolve(Buffer.concat(chunks)));
     doc.on('error', reject);
 
-    const pageWidth = 595.28;
-    const pageHeight = 841.89;
+    const pageWidth = landscape ? 841.89 : 595.28;
+    const pageHeight = landscape ? 595.28 : 841.89;
     const margin = 42;
     const contentWidth = pageWidth - margin * 2;
     const green = '#047857';
@@ -380,13 +419,14 @@ function createReportPdf(rows, filters) {
     const summary = getReportSummary(rows, aggregatedRows, filters);
     const bidangNames = [...new Set(rows.map((row) => row.nama_bidang).filter(Boolean))];
     const bidangName = filters.nama_bidang || (bidangNames.length ? bidangNames.join(', ') : 'Semua Bidang');
-    const columns = [
-      { label: 'Deskripsi Program Kerja', x: margin, width: 190 },
-      { label: 'Periode & Kuantitas', x: margin + 190, width: 100 },
-      { label: 'Progress', x: margin + 290, width: 58 },
-      { label: 'Total Anggaran', x: margin + 348, width: 92 },
-      { label: 'Sisa Saldo', x: margin + 440, width: contentWidth - 440 }
-    ];
+    const widthScale = contentWidth / estimatedWidth;
+    let cursor = margin;
+    const columns = selectedColumns.map((key) => {
+      const definition = columnDefinitions[key];
+      const column = { ...definition, x: cursor, width: definition.width * widthScale };
+      cursor += column.width;
+      return column;
+    });
 
     const drawHeader = () => {
       doc.addPage();
@@ -439,11 +479,11 @@ function createReportPdf(rows, filters) {
     };
 
     const getRowHeight = (row) => {
-      const description = row.deskripsi || row.judul || '-';
-      const period = getReportPeriodText(row);
-      const descriptionHeight = doc.heightOfString(description, { width: columns[0].width - 16, fontSize: 8.5 });
-      const periodHeight = doc.heightOfString(period, { width: columns[1].width - 16, fontSize: 8 });
-      return Math.max(31, Math.ceil(Math.max(descriptionHeight, periodHeight) + 16));
+      const heights = columns.map((column) => doc.heightOfString(column.value(row, 0), {
+        width: Math.max(20, column.width - 16),
+        fontSize: column === columns[0] ? 8.5 : 8
+      }));
+      return Math.max(31, Math.ceil(Math.max(...heights) + 16));
     };
 
     let y = drawHeader();
@@ -461,21 +501,14 @@ function createReportPdf(rows, filters) {
         doc.save().rect(margin, y, contentWidth, rowHeight).fill('#F8FAFC').restore();
       }
       doc.strokeColor(border).lineWidth(0.45).moveTo(margin, y + rowHeight).lineTo(margin + contentWidth, y + rowHeight).stroke();
-      const values = [
-        `${index + 1}. ${row.deskripsi || row.judul || '-'}`,
-        getReportPeriodText(row),
-        `${row.progress}%`,
-        formatPdfCurrency(row.totalSpent),
-        formatPdfCurrency(row.remaining)
-      ];
-      values.forEach((value, columnIndex) => {
-        const column = columns[columnIndex];
-        doc.fillColor('#1E293B').font(columnIndex === 0 ? 'Helvetica' : 'Helvetica')
+      columns.forEach((column, columnIndex) => {
+        const value = column.value(row, index);
+        doc.fillColor('#1E293B').font('Helvetica')
           .fontSize(columnIndex === 0 ? 8.5 : 8)
           .text(value, column.x + 8, y + 8, {
             width: column.width - 16,
             height: rowHeight - 12,
-            align: columnIndex >= 2 ? 'right' : 'left'
+            align: column.align || 'left'
           });
       });
       y += rowHeight;

@@ -13,6 +13,7 @@ import Departments from './pages/Departments';
 import Users from './pages/Users';
 import Reports from './pages/Reports';
 import CrossRequests from './pages/CrossRequests';
+import PatrolDashboard from './pages/PatrolDashboard';
 
 function AuthenticatedApp() {
   const { isAuthenticated, loading } = useAuth();
@@ -53,6 +54,7 @@ function AuthenticatedApp() {
     departments: <Departments {...pageProps} />,
     users: <Users {...pageProps} />,
     reports: <Reports {...pageProps} />,
+    patrol: <PatrolDashboard {...pageProps} />,
   }[activeTab] || <Dashboard {...pageProps} onNavigate={(tab, filters = {}) => { setTaskFilters(filters); setActiveTab(tab); }} />;
 
   return (

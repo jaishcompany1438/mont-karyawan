@@ -19,7 +19,7 @@ async function login(req, res) {
 
     const db = getPool();
     const [rows] = await db.query(
-      `SELECT u.id, u.nama, u.email, u.password, u.role, u.bidang_id, u.jabatan, u.sub_bidang,
+      `SELECT u.id, u.nama, u.email, u.password, u.role, u.bidang_id, u.jabatan, u.sub_bidang, u.can_patroli,
               b.nama_bidang, b.kode_bidang, b.parent_role
        FROM users u
        LEFT JOIN bidang b ON u.bidang_id = b.id
@@ -46,7 +46,8 @@ async function login(req, res) {
       nama_bidang: user.nama_bidang,
       kode_bidang: user.kode_bidang,
       jabatan: user.jabatan,
-      sub_bidang: user.sub_bidang
+      sub_bidang: user.sub_bidang,
+      can_patroli: Boolean(user.can_patroli)
       ,parent_role: user.parent_role
     };
 
@@ -72,7 +73,7 @@ async function getMe(req, res) {
 
     const db = getPool();
     const [rows] = await db.query(
-      `SELECT u.id, u.nama, u.email, u.role, u.bidang_id, u.jabatan, u.sub_bidang,
+      `SELECT u.id, u.nama, u.email, u.role, u.bidang_id, u.jabatan, u.sub_bidang, u.can_patroli,
               b.nama_bidang, b.kode_bidang, b.parent_role
        FROM users u
        LEFT JOIN bidang b ON u.bidang_id = b.id
@@ -84,7 +85,7 @@ async function getMe(req, res) {
       return res.status(404).json({ success: false, message: 'Pengguna tidak ditemukan.' });
     }
 
-    return res.json({ success: true, user: rows[0] });
+    return res.json({ success: true, user: { ...rows[0], can_patroli: Boolean(rows[0].can_patroli) } });
   } catch (error) {
     return res.status(500).json({ success: false, message: 'Gagal mengambil data profil: ' + error.message });
   }

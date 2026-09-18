@@ -104,11 +104,11 @@ export const api = {
     return handleResponse(res);
   },
 
-  async reviewTask(id, { action, catatan_revisi }) {
+  async reviewTask(id, { action, catatan_revisi, catatan_reviewer, nilai_sop, nilai_waktu, nilai_kualitas }) {
     const res = await fetch(`${BASE_URL}/tasks/${id}/review`, {
       method: 'POST',
       headers: getHeaders(),
-      body: JSON.stringify({ action, catatan_revisi })
+      body: JSON.stringify({ action, catatan_revisi, catatan_reviewer, nilai_sop, nilai_waktu, nilai_kualitas })
     });
     return handleResponse(res);
   },
@@ -166,6 +166,60 @@ export const api = {
 
   async deleteUser(id) {
     const res = await fetch(`${BASE_URL}/users/${id}`, {
+      method: 'DELETE',
+      headers: getHeaders()
+    });
+    return handleResponse(res);
+  },
+
+  async getPatrolRooms() {
+    const res = await fetch(`${BASE_URL}/patroli/ruangan`, { headers: getHeaders() });
+    return handleResponse(res);
+  },
+
+  async createPatrolRoom(nama_ruangan) {
+    const res = await fetch(`${BASE_URL}/patroli/ruangan`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify({ nama_ruangan })
+    });
+    return handleResponse(res);
+  },
+
+  async getPatrols(params = {}) {
+    const query = new URLSearchParams();
+    Object.entries(params).forEach(([key, value]) => {
+      if (value !== undefined && value !== null && value !== '') query.append(key, value);
+    });
+    const res = await fetch(`${BASE_URL}/patroli?${query.toString()}`, { headers: getHeaders() });
+    return handleResponse(res);
+  },
+
+  async getPatrolDashboard() {
+    const res = await fetch(`${BASE_URL}/patroli/dashboard`, { headers: getHeaders() });
+    return handleResponse(res);
+  },
+
+  async createPatrol(formData) {
+    const res = await fetch(`${BASE_URL}/patroli`, {
+      method: 'POST',
+      headers: getHeaders(true),
+      body: formData
+    });
+    return handleResponse(res);
+  },
+
+  async updatePatrol(id, formData) {
+    const res = await fetch(`${BASE_URL}/patroli/${id}`, {
+      method: 'PUT',
+      headers: getHeaders(true),
+      body: formData
+    });
+    return handleResponse(res);
+  },
+
+  async deletePatrol(id) {
+    const res = await fetch(`${BASE_URL}/patroli/${id}`, {
       method: 'DELETE',
       headers: getHeaders()
     });
@@ -325,4 +379,3 @@ export const api = {
     return handleResponse(res);
   }
 };
-

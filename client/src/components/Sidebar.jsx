@@ -10,6 +10,7 @@ import {
   Upload,
   FileDown,
   ArrowRightLeft
+  ,ClipboardCheck
 } from 'lucide-react';
 
 export default function Sidebar({
@@ -29,12 +30,14 @@ export default function Sidebar({
   const canManageUsers = ['SUPER_ADMIN', 'MUDIR'].includes(role);
   // Setiap bidang bisa mengakses kecuali bawahan bidang (STAF)
   const canAccessCrossDept = role && role !== 'STAF';
+  const canAccessPatrol = role === 'SUPER_ADMIN' || Boolean(user?.can_patroli) || ['MUDIR', 'WAKIL_MUDIR', 'WADIR_PEND', 'WADIR_PENGS', 'KABID'].includes(role);
 
   const navItems = [
     { id: 'dashboard', label: 'Dashboard Utama', icon: LayoutDashboard },
     { id: 'tasks', label: 'Manajemen Tugas', icon: CheckSquare },
     { id: 'reports', label: 'Laporan & Rekap', icon: FileSpreadsheet },
   ];
+  if (canAccessPatrol) navItems.push({ id: 'patrol', label: 'Patroli Fasilitas', icon: ClipboardCheck });
 
   if (canAccessCrossDept) {
     navItems.push({ id: 'cross-requests', label: 'Tugas Lintas Bidang', icon: ArrowRightLeft });

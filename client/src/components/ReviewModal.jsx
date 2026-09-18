@@ -1,11 +1,26 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { api } from '../services/api';
 import { X, CheckCircle, RotateCcw, Paperclip, FileText, User } from 'lucide-react';
 
 export default function ReviewModal({ isOpen, onClose, onSuccess, task }) {
   const [catatanRevisi, setCatatanRevisi] = useState('');
+  const [catatanReviewer, setCatatanReviewer] = useState('');
+  const [ratings, setRatings] = useState({ sop: '3', waktu: '3', kualitas: '3' });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+
+  useEffect(() => {
+    if (isOpen && task) {
+      setCatatanRevisi(task.catatan_revisi || '');
+      setCatatanReviewer(task.catatan_reviewer || '');
+      setRatings({
+        sop: String(task.nilai_sop ?? '3'),
+        waktu: String(task.nilai_waktu ?? '3'),
+        kualitas: String(task.nilai_kualitas ?? '3')
+      });
+      setError('');
+    }
+  }, [isOpen, task]);
 
   if (!isOpen || !task) return null;
 
@@ -18,10 +33,18 @@ export default function ReviewModal({ isOpen, onClose, onSuccess, task }) {
     try {
       setLoading(true);
       setError('');
+      if (!ratings.sop || !ratings.waktu || !ratings.kualitas) {
+        setError('Semua nilai reviewer wajib diisi.');
+        return;
+      }
 
       await api.reviewTask(task.id, {
         action,
-        catatan_revisi: catatanRevisi.trim()
+        catatan_revisi: catatanRevisi.trim(),
+        catatan_reviewer: catatanReviewer.trim(),
+        nilai_sop: ratings.sop,
+        nilai_waktu: ratings.waktu,
+        nilai_kualitas: ratings.kualitas
       });
 
       onSuccess();
@@ -108,6 +131,38 @@ export default function ReviewModal({ isOpen, onClose, onSuccess, task }) {
           </div>
 
           {/* Revision Notes Input */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            {[
+              ['sop', 'Nilai SOP'],
+              ['waktu', 'Nilai Waktu'],
+              ['kualitas', 'Nilai Kualitas']
+            ].map(([key, label]) => (
+              <label key={key} className="font-bold text-slate-700">
+                {label} (1-5)
+                <input
+                  type="number"
+                  min="1"
+                  max="5"
+                  step="0.1"
+                  value={ratings[key]}
+                  onChange={(e) => setRatings((current) => ({ ...current, [key]: e.target.value }))}
+                  className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 font-normal text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                />
+              </label>
+            ))}
+          </div>
+          <div>
+            <label className="block font-bold text-slate-700 mb-1">
+              Catatan Reviewer
+            </label>
+            <textarea
+              rows="2"
+              placeholder="Catatan penilaian untuk dokumentasi laporan..."
+              value={catatanReviewer}
+              onChange={(e) => setCatatanReviewer(e.target.value)}
+              className="w-full px-3.5 py-2 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-emerald-500 text-slate-800"
+            />
+          </div>
           <div>
             <label className="block font-bold text-slate-700 mb-1">
               Catatan Revisi / Masukan (Wajib diisi jika menolak/minta perbaikan)

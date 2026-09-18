@@ -11,7 +11,7 @@ async function getAllUsers(req, res) {
     const db = getPool();
 
     let query = `
-      SELECT u.id, u.nama, u.email, u.role, u.bidang_id, u.jabatan, u.sub_bidang, u.no_telepon, u.created_at,
+      SELECT u.id, u.nama, u.email, u.role, u.bidang_id, u.jabatan, u.sub_bidang, u.no_telepon, u.can_patroli, u.created_at,
              b.nama_bidang, b.kode_bidang, b.parent_role
       FROM users u
       LEFT JOIN bidang b ON u.bidang_id = b.id
@@ -99,7 +99,7 @@ async function getAssignees(req, res) {
 
 async function createUser(req, res) {
   try {
-    const { nama, email, password, role, bidang_id, jabatan, sub_bidang, no_telepon } = req.body;
+    const { nama, email, password, role, bidang_id, jabatan, sub_bidang, no_telepon, can_patroli } = req.body;
     if (!nama || !email || !password || !role) {
       return res.status(400).json({ success: false, message: 'Nama, email, password, dan role wajib diisi.' });
     }
@@ -119,15 +119,15 @@ async function createUser(req, res) {
     const hashedPassword = await bcrypt.hash(password, salt);
 
     const [result] = await db.query(
-      `INSERT INTO users (nama, email, password, role, bidang_id, jabatan, sub_bidang, no_telepon)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-      [nama.trim(), email.trim().toLowerCase(), hashedPassword, role, bidang_id || null, jabatan || null, sub_bidang || null, no_telepon || null]
+      `INSERT INTO users (nama, email, password, role, bidang_id, jabatan, sub_bidang, no_telepon, can_patroli)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [nama.trim(), email.trim().toLowerCase(), hashedPassword, role, bidang_id || null, jabatan || null, sub_bidang || null, no_telepon || null, can_patroli ? 1 : 0]
     );
 
     return res.status(201).json({
       success: true,
       message: 'Pengguna berhasil ditambahkan.',
-      data: { id: result.insertId, nama, email, role, bidang_id, jabatan, sub_bidang, no_telepon }
+      data: { id: result.insertId, nama, email, role, bidang_id, jabatan, sub_bidang, no_telepon, can_patroli: Boolean(can_patroli) }
     });
   } catch (error) {
     return res.status(500).json({ success: false, message: 'Gagal menambahkan pengguna: ' + error.message });
@@ -137,7 +137,7 @@ async function createUser(req, res) {
 async function updateUser(req, res) {
   try {
     const { id } = req.params;
-    const { nama, email, password, role, bidang_id, jabatan, sub_bidang, no_telepon } = req.body;
+    const { nama, email, password, role, bidang_id, jabatan, sub_bidang, no_telepon, can_patroli } = req.body;
 
     if (!nama || !email || !role) {
       return res.status(400).json({ success: false, message: 'Nama, email, dan role wajib diisi.' });
@@ -158,13 +158,13 @@ async function updateUser(req, res) {
       const salt = await bcrypt.genSalt(10);
       const hashedPassword = await bcrypt.hash(password, salt);
       await db.query(
-        `UPDATE users SET nama = ?, email = ?, password = ?, role = ?, bidang_id = ?, jabatan = ?, sub_bidang = ?, no_telepon = ? WHERE id = ?`,
-        [nama.trim(), email.trim().toLowerCase(), hashedPassword, role, bidang_id || null, jabatan || null, sub_bidang || null, no_telepon || null, id]
+        `UPDATE users SET nama = ?, email = ?, password = ?, role = ?, bidang_id = ?, jabatan = ?, sub_bidang = ?, no_telepon = ?, can_patroli = ? WHERE id = ?`,
+        [nama.trim(), email.trim().toLowerCase(), hashedPassword, role, bidang_id || null, jabatan || null, sub_bidang || null, no_telepon || null, can_patroli ? 1 : 0, id]
       );
     } else {
       await db.query(
-        `UPDATE users SET nama = ?, email = ?, role = ?, bidang_id = ?, jabatan = ?, sub_bidang = ?, no_telepon = ? WHERE id = ?`,
-        [nama.trim(), email.trim().toLowerCase(), role, bidang_id || null, jabatan || null, sub_bidang || null, no_telepon || null, id]
+        `UPDATE users SET nama = ?, email = ?, role = ?, bidang_id = ?, jabatan = ?, sub_bidang = ?, no_telepon = ?, can_patroli = ? WHERE id = ?`,
+        [nama.trim(), email.trim().toLowerCase(), role, bidang_id || null, jabatan || null, sub_bidang || null, no_telepon || null, can_patroli ? 1 : 0, id]
       );
     }
 
