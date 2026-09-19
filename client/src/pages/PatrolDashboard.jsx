@@ -40,7 +40,7 @@ export default function PatrolDashboard({ refreshKey, onRefresh }) {
   const [selected, setSelected] = useState(null);
   const [activeGroup, setActiveGroup] = useState(null);
   const [error, setError] = useState('');
-  const canPatrol = user?.role === 'SUPER_ADMIN' || user?.can_patroli || ['MUDIR', 'WAKIL_MUDIR', 'WADIR_PEND', 'WADIR_PENGS', 'KABID'].includes(user?.role);
+  const canPatrol = user?.role === 'SUPER_ADMIN' || user?.can_patroli || ['MUDIR', 'WAKIL_MUDIR', 'WADIR_PENGS'].includes(user?.role);
   const canManageRooms = user?.role === 'SUPER_ADMIN';
 
   const load = async () => {
