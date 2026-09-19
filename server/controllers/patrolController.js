@@ -33,7 +33,7 @@ function normalizeColor(value, field) {
 }
 
 function canAccessPatrol(user) {
-  return user.role === 'SUPER_ADMIN' || LEADERSHIP_ROLES.includes(user.role) || Boolean(user.can_patroli);
+  return user.role === 'SUPER_ADMIN' ||  Boolean(user.can_patroli);
 }
 
 function canCreatePatrol(user) {
