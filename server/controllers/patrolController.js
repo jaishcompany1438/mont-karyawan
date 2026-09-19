@@ -2,7 +2,7 @@ const fs = require('fs');
 const { getPool, isDbConnected } = require('../config/db');
 
 const COLORS = ['MERAH', 'ORANYE', 'HIJAU'];
-const LEADERSHIP_ROLES = ['MUDIR', 'WAKIL_MUDIR', 'WADIR_PEND', 'WADIR_PENGS', 'KABID'];
+const LEADERSHIP_ROLES = ['MUDIR', 'WAKIL_MUDIR', 'WADIR_PENGS'];
 
 // Patrol data is a shared facility record: every account allowed to access the
 // patrol module (Super Admin, leadership/atasan, or any Kabid/Staff granted
