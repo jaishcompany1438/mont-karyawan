@@ -38,7 +38,7 @@ async function getDashboardStats(req, res) {
       params.push(filterBidangId);
     }
 
-    if (periode && ['HARIAN', 'PEKANAN', 'BULANAN', 'TAHUNAN'].includes(periode.toUpperCase())) {
+    if (periode && ['HARIAN', 'PEKANAN', 'BULANAN', 'TAHUNAN', 'INSIDENTAL'].includes(periode.toUpperCase())) {
       whereClause += ' AND periode = ?';
       params.push(periode.toUpperCase());
     }
@@ -284,7 +284,7 @@ function parseReportDate(value) {
 }
 
 function getExpectedOccurrences(period, category, startDate, endDate, actualCount) {
-  if (category === 'MENDADAK') return actualCount;
+  if (category === 'MENDADAK' || period === 'INSIDENTAL') return actualCount;
   if (!startDate || !endDate || endDate < startDate) return actualCount;
   const start = new Date(startDate);
   const end = new Date(endDate);
@@ -358,7 +358,8 @@ function getPeriodLabel(period) {
     HARIAN: 'Harian',
     PEKANAN: 'Pekanan',
     BULANAN: 'Bulanan',
-    TAHUNAN: 'Tahunan'
+    TAHUNAN: 'Tahunan',
+    INSIDENTAL: 'Insidental'
   }[period] || period || '-';
 }
 

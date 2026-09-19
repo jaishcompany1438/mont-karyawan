@@ -4,18 +4,11 @@ const { getPool, isDbConnected } = require('../config/db');
 const COLORS = ['MERAH', 'ORANYE', 'HIJAU'];
 const LEADERSHIP_ROLES = ['MUDIR', 'WAKIL_MUDIR', 'WADIR_PEND', 'WADIR_PENGS', 'KABID'];
 
-function getPatrolScope(user, alias = 'p') {
-  if (user.role === 'SUPER_ADMIN' || user.role === 'MUDIR') return { clause: '1=1', params: [] };
-  if (user.role === 'WADIR_PEND' || user.role === 'WADIR_PENGS') {
-    return {
-      clause: `(u.id = ? OR b.parent_role = ?)`,
-      params: [user.id, user.role]
-    };
-  }
-  if (user.role === 'KABID') {
-    return { clause: `(u.id = ? OR u.bidang_id = ?)`, params: [user.id, user.bidang_id] };
-  }
-  return { clause: 'p.user_id = ?', params: [user.id] };
+// Patrol data is a shared facility record: every account allowed to access the
+// patrol module (Super Admin, leadership/atasan, or any Kabid/Staff granted
+// can_patroli) sees the same connected dataset instead of a role-scoped subset.
+function getPatrolScope() {
+  return { clause: '1=1', params: [] };
 }
 
 function normalizeScore(value, field) {
@@ -24,6 +17,13 @@ function normalizeScore(value, field) {
     throw new Error(`${field} harus berada di antara 0 sampai 5.`);
   }
   return Math.round(score * 10) / 10;
+}
+
+// Single source of truth for score-to-color mapping (0-1.5 MERAH, 1.6-3.9 ORANYE, 4-5 HIJAU).
+function deriveColorFromScore(score) {
+  if (score <= 1.5) return 'MERAH';
+  if (score <= 3.9) return 'ORANYE';
+  return 'HIJAU';
 }
 
 function normalizeColor(value, field) {
@@ -70,22 +70,23 @@ async function createPatrol(req, res) {
   try {
     if (!canCreatePatrol(req.user)) return res.status(403).json({ success: false, message: 'Anda tidak memiliki hak melakukan patroli.' });
     const {
-      ruangan, tanggal, nilai_kebersihan, nilai_kerapihan, nilai_sarpras, nilai_ketertiban,
+      ruangan, tanggal,
       skor_kebersihan, skor_kerapihan, skor_sarpras, skor_ketertiban, catatan_temuan
     } = req.body;
     if (!ruangan || !tanggal) return res.status(400).json({ success: false, message: 'Area dan tanggal wajib diisi.' });
 
-    const colors = {
-      kebersihan: normalizeColor(nilai_kebersihan, 'Nilai kebersihan'),
-      kerapihan: normalizeColor(nilai_kerapihan, 'Nilai kerapihan'),
-      sarpras: normalizeColor(nilai_sarpras, 'Nilai sarpras'),
-      ketertiban: normalizeColor(nilai_ketertiban, 'Nilai ketertiban')
-    };
     const scores = {
       kebersihan: normalizeScore(skor_kebersihan, 'Skor kebersihan'),
       kerapihan: normalizeScore(skor_kerapihan, 'Skor kerapihan'),
       sarpras: normalizeScore(skor_sarpras, 'Skor sarpras'),
       ketertiban: normalizeScore(skor_ketertiban, 'Skor ketertiban')
+    };
+    // Color is always derived server-side from the score to keep a single, tamper-proof source of truth.
+    const colors = {
+      kebersihan: deriveColorFromScore(scores.kebersihan),
+      kerapihan: deriveColorFromScore(scores.kerapihan),
+      sarpras: deriveColorFromScore(scores.sarpras),
+      ketertiban: deriveColorFromScore(scores.ketertiban)
     };
     const note = String(catatan_temuan || '').trim();
     if (Object.values(colors).includes('MERAH') && !note) {
@@ -165,17 +166,18 @@ async function updatePatrol(req, res) {
     const canEdit = current.user_id === req.user.id || ['SUPER_ADMIN', 'MUDIR', 'WAKIL_MUDIR', 'WADIR_PEND', 'WADIR_PENGS', 'KABID'].includes(req.user.role);
     if (!canEdit) return res.status(403).json({ success: false, message: 'Anda tidak dapat mengubah data patroli ini.' });
     const body = req.body;
-    const colors = {
-      kebersihan: normalizeColor(body.nilai_kebersihan || current.nilai_kebersihan, 'Nilai kebersihan'),
-      kerapihan: normalizeColor(body.nilai_kerapihan || current.nilai_kerapihan, 'Nilai kerapihan'),
-      sarpras: normalizeColor(body.nilai_sarpras || current.nilai_sarpras, 'Nilai sarpras'),
-      ketertiban: normalizeColor(body.nilai_ketertiban || current.nilai_ketertiban, 'Nilai ketertiban')
-    };
     const scores = {
       kebersihan: normalizeScore(body.skor_kebersihan ?? current.skor_kebersihan, 'Skor kebersihan'),
       kerapihan: normalizeScore(body.skor_kerapihan ?? current.skor_kerapihan, 'Skor kerapihan'),
       sarpras: normalizeScore(body.skor_sarpras ?? current.skor_sarpras, 'Skor sarpras'),
       ketertiban: normalizeScore(body.skor_ketertiban ?? current.skor_ketertiban, 'Skor ketertiban')
+    };
+    // Color is always derived server-side from the score to keep a single, tamper-proof source of truth.
+    const colors = {
+      kebersihan: deriveColorFromScore(scores.kebersihan),
+      kerapihan: deriveColorFromScore(scores.kerapihan),
+      sarpras: deriveColorFromScore(scores.sarpras),
+      ketertiban: deriveColorFromScore(scores.ketertiban)
     };
     const note = String(body.catatan_temuan ?? current.catatan_temuan ?? '').trim();
     if (Object.values(colors).includes('MERAH') && !note) return res.status(400).json({ success: false, message: 'Catatan temuan wajib diisi jika ada penilaian MERAH.' });
