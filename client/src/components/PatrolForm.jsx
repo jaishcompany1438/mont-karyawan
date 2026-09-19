@@ -10,8 +10,8 @@ const PARAMETERS = [
 ];
 
 function getColor(score) {
-  if (score < 2) return 'MERAH';
-  if (score <= 3) return 'ORANYE';
+  if (score <= 1.5) return 'MERAH';
+  if (score <= 3.9) return 'ORANYE';
   return 'HIJAU';
 }
 

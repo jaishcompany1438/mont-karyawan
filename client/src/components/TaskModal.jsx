@@ -190,6 +190,7 @@ export default function TaskModal({ isOpen, onClose, onSuccess, initialTask = nu
                 <option value="PEKANAN">PEKANAN (Weekly)</option>
                 <option value="BULANAN">BULANAN (Monthly)</option>
                 <option value="TAHUNAN">TAHUNAN (Annual)</option>
+                <option value="INSIDENTAL">INSIDENTAL (Sewaktu-waktu)</option>
               </select>
             </div>
             <div>

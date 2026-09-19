@@ -1,5 +1,5 @@
 import React from 'react';
-import { Calendar, Clock, CalendarDays, CalendarRange, Layers } from 'lucide-react';
+import { Calendar, Clock, CalendarDays, CalendarRange, Layers, Zap } from 'lucide-react';
 
 export default function PeriodTabs({ selectedPeriod, onChange, counts = {} }) {
   const tabs = [
@@ -8,6 +8,7 @@ export default function PeriodTabs({ selectedPeriod, onChange, counts = {} }) {
     { id: 'PEKANAN', label: 'Pekanan (Weekly)', icon: CalendarDays, badgeKey: 'PEKANAN' },
     { id: 'BULANAN', label: 'Bulanan (Monthly)', icon: CalendarRange, badgeKey: 'BULANAN' },
     { id: 'TAHUNAN', label: 'Tahunan (Annual)', icon: Calendar, badgeKey: 'TAHUNAN' },
+    { id: 'INSIDENTAL', label: 'Insidental', icon: Zap, badgeKey: 'INSIDENTAL' },
   ];
 
   return (

@@ -77,7 +77,7 @@ async function initDB() {
         judul VARCHAR(255) NOT NULL,
         deskripsi TEXT NULL,
         parent_role ENUM('WADIR_PEND', 'WADIR_PENGS') NULL,
-        periode ENUM('HARIAN', 'PEKANAN', 'BULANAN', 'TAHUNAN') NOT NULL DEFAULT 'HARIAN',
+        periode ENUM('HARIAN', 'PEKANAN', 'BULANAN', 'TAHUNAN', 'INSIDENTAL') NOT NULL DEFAULT 'HARIAN',
         kategori ENUM('RUTIN', 'PROYEK', 'MENDADAK') DEFAULT 'RUTIN',
         prioritas ENUM('RENDAH', 'SEDANG', 'TINGGI', 'URGEN') DEFAULT 'SEDANG',
         status ENUM('TO_DO', 'IN_PROGRESS', 'UNDER_REVIEW', 'COMPLETED', 'REVISION') DEFAULT 'TO_DO',
@@ -251,6 +251,7 @@ async function initDB() {
 
     // ALTER ENUMs rather than recreating users, preserving all existing data.
     await db.query("ALTER TABLE users MODIFY COLUMN role ENUM('SUPER_ADMIN','MUDIR','WAKIL_MUDIR','WADIR_PEND','WADIR_PENGS','KABID','STAF') NOT NULL");
+    await db.query("ALTER TABLE tasks MODIFY COLUMN periode ENUM('HARIAN','PEKANAN','BULANAN','TAHUNAN','INSIDENTAL') NOT NULL DEFAULT 'HARIAN'");
     // A period is the recurrence declaration for legacy periodic tasks.
     await db.query(`UPDATE tasks SET is_recurring = 1 WHERE periode IN ('HARIAN', 'PEKANAN', 'BULANAN') AND is_recurring = 0`);
 

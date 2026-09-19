@@ -1,6 +1,7 @@
 const ExcelJS = require('exceljs');
 const bcrypt = require('bcryptjs');
 const { getPool, isDbConnected } = require('../config/db');
+const { parseHolidayExclusions } = require('./taskController');
 
 // Download Excel Template (tugas, karyawan, bidang)
 async function downloadTemplate(req, res) {
@@ -15,13 +16,14 @@ async function downloadTemplate(req, res) {
       sheet.columns = [
         { header: 'Judul Tugas', key: 'judul', width: 35 },
         { header: 'Deskripsi', key: 'deskripsi', width: 45 },
-        { header: 'Periode (HARIAN/PEKANAN/BULANAN/TAHUNAN)', key: 'periode', width: 38 },
+        { header: 'Periode (HARIAN/PEKANAN/BULANAN/TAHUNAN/INSIDENTAL)', key: 'periode', width: 40 },
         { header: 'Email Assignee', key: 'email_assignee', width: 30 },
         { header: 'Prioritas (RENDAH/SEDANG/TINGGI/URGEN)', key: 'prioritas', width: 35 },
         { header: 'Due Date (YYYY-MM-DD HH:mm)', key: 'due_date', width: 30 },
         { header: 'Anggaran Dana (wajib, boleh 0)', key: 'anggaran_dana', width: 28 },
         { header: 'Anggaran Terpakai (boleh 0)', key: 'anggaran_terpakai', width: 28 },
-        { header: 'Berulang? (YA/TIDAK, default YA untuk H/P/B)', key: 'is_recurring', width: 38 }
+        { header: 'Berulang? (YA/TIDAK, default YA untuk H/P/B)', key: 'is_recurring', width: 38 },
+        { header: 'Pengecualian Hari Libur (SATURDAY,SUNDAY / YYYY-MM-DD, pisahkan koma)', key: 'libur_pengecualian', width: 45 }
       ];
 
       // Format Header
@@ -45,14 +47,15 @@ async function downloadTemplate(req, res) {
         due_date: '2026-09-15 16:00',
         anggaran_dana: 0,
         anggaran_terpakai: 0,
-        is_recurring: 'YA'
+        is_recurring: 'YA',
+        libur_pengecualian: 'SATURDAY,SUNDAY'
       });
 
       // Data Validation / Instructions
       sheet.dataValidations.add('C2:C1000', {
         type: 'list',
         allowBlank: false,
-        formulae: ['"HARIAN,PEKANAN,BULANAN,TAHUNAN"']
+        formulae: ['"HARIAN,PEKANAN,BULANAN,TAHUNAN,INSIDENTAL"']
       });
 
       sheet.dataValidations.add('E2:E1000', {
@@ -75,7 +78,8 @@ async function downloadTemplate(req, res) {
         { header: 'Role (MUDIR/WAKIL_MUDIR/WADIR_PEND/WADIR_PENGS/KABID/STAF)', key: 'role', width: 44 },
         { header: 'Kode Bidang', key: 'kode_bidang', width: 20 },
         { header: 'Jabatan', key: 'jabatan', width: 30 },
-        { header: 'Sub-Bidang / Unit', key: 'sub_bidang', width: 30 }
+        { header: 'Sub-Bidang / Unit', key: 'sub_bidang', width: 30 },
+        { header: 'Boleh Patroli? (YA/TIDAK)', key: 'can_patroli', width: 26 }
       ];
 
       const headerRow = sheet.getRow(1);
@@ -95,7 +99,8 @@ async function downloadTemplate(req, res) {
         role: 'STAF',
         kode_bidang: 'ITMED',
         jabatan: 'Staf Dokumentasi & Media',
-        sub_bidang: 'Publikasi Digital'
+        sub_bidang: 'Publikasi Digital',
+        can_patroli: 'TIDAK'
       });
 
       sheet.dataValidations.add('D2:D1000', {
@@ -185,6 +190,7 @@ async function importTasks(req, res) {
         const budgetRaw = row.getCell(7).text?.trim();
         const spentRaw = row.getCell(8).text?.trim();
         const recurringRaw = row.getCell(9).text?.trim().toUpperCase();
+        const liburRaw = row.getCell(10).text?.trim();
 
         if (judul && emailAssignee) {
           rows.push({
@@ -197,7 +203,8 @@ async function importTasks(req, res) {
             dueDateRaw,
             budgetRaw,
             spentRaw,
-            recurringRaw
+            recurringRaw,
+            liburRaw
           });
         }
       }
@@ -233,7 +240,7 @@ async function importTasks(req, res) {
 
         // Validate Period
         let periode = 'HARIAN';
-        if (['HARIAN', 'PEKANAN', 'BULANAN', 'TAHUNAN'].includes(item.periodeRaw)) {
+        if (['HARIAN', 'PEKANAN', 'BULANAN', 'TAHUNAN', 'INSIDENTAL'].includes(item.periodeRaw)) {
           periode = item.periodeRaw;
         }
 
@@ -267,9 +274,20 @@ async function importTasks(req, res) {
           errors.push(`Baris ${item.rowNumber}: Bidang tugas harus berada di cabang Wadir.`);
           continue;
         }
-        const isRecurring = item.recurringRaw
-          ? ['YA', 'Y', 'YES', '1', 'TRUE'].includes(item.recurringRaw) ? 1 : 0
-          : ['HARIAN', 'PEKANAN', 'BULANAN'].includes(periode) ? 1 : 0;
+        const isRecurring = ['HARIAN', 'PEKANAN', 'BULANAN'].includes(periode)
+          ? (item.recurringRaw ? (['YA', 'Y', 'YES', '1', 'TRUE'].includes(item.recurringRaw) ? 1 : 0) : 1)
+          : 0;
+
+        let holidayExclusions = [];
+        if (item.liburRaw) {
+          try {
+            holidayExclusions = parseHolidayExclusions(item.liburRaw);
+          } catch (holidayError) {
+            errors.push(`Baris ${item.rowNumber}: ${holidayError.message}`);
+            continue;
+          }
+        }
+        const holidayExclusionsJson = JSON.stringify(holidayExclusions);
 
         const [existingTasks] = await db.query(
           'SELECT id FROM tasks WHERE judul = ? AND assigned_to = ? AND due_date = ? LIMIT 1',
@@ -277,15 +295,15 @@ async function importTasks(req, res) {
         );
         if (existingTasks.length > 0) {
           await db.query(
-            `UPDATE tasks SET deskripsi = ?, periode = ?, prioritas = ?, bidang_id = ?, anggaran_dana = ?, anggaran_terpakai = ?, is_recurring = ? WHERE id = ?`,
-            [item.deskripsi || null, periode, prioritas, targetBidangId, budget, spent, isRecurring, existingTasks[0].id]
+            `UPDATE tasks SET deskripsi = ?, periode = ?, prioritas = ?, bidang_id = ?, anggaran_dana = ?, anggaran_terpakai = ?, is_recurring = ?, libur_pengecualian = ? WHERE id = ?`,
+            [item.deskripsi || null, periode, prioritas, targetBidangId, budget, spent, isRecurring, holidayExclusionsJson, existingTasks[0].id]
           );
         } else {
           await db.query(
             `INSERT INTO tasks (
             judul, deskripsi, periode, kategori, prioritas, status,
-            created_by, assigned_to, bidang_id, due_date, anggaran_dana, anggaran_terpakai, is_recurring
-          ) VALUES (?, ?, ?, 'RUTIN', ?, 'TO_DO', ?, ?, ?, ?, ?, ?, ?)`,
+            created_by, assigned_to, bidang_id, due_date, anggaran_dana, anggaran_terpakai, is_recurring, libur_pengecualian
+          ) VALUES (?, ?, ?, 'RUTIN', ?, 'TO_DO', ?, ?, ?, ?, ?, ?, ?, ?)`,
             [
             item.judul,
             item.deskripsi || null,
@@ -297,7 +315,8 @@ async function importTasks(req, res) {
             dueDate,
             budget,
             spent,
-            isRecurring
+            isRecurring,
+            holidayExclusionsJson
             ]
           );
         }
@@ -356,9 +375,10 @@ async function importKaryawan(req, res) {
         const kodeBidang = row.getCell(5).text?.trim().toUpperCase();
         const jabatan = row.getCell(6).text?.trim();
         const subBidang = row.getCell(7).text?.trim();
+        const canPatroliRaw = row.getCell(8).text?.trim().toUpperCase();
 
         if (nama && email && role) {
-          rows.push({ rowNumber, nama, email, password, role, kodeBidang, jabatan, subBidang });
+          rows.push({ rowNumber, nama, email, password, role, kodeBidang, jabatan, subBidang, canPatroliRaw });
         }
       }
     });
@@ -372,6 +392,7 @@ async function importKaryawan(req, res) {
         }
 
         const bidangId = item.kodeBidang && bidangMap[item.kodeBidang] ? bidangMap[item.kodeBidang] : null;
+        const canPatroli = ['YA', 'Y', 'YES', '1', 'TRUE'].includes(item.canPatroliRaw) ? 1 : 0;
 
         const salt = await bcrypt.genSalt(10);
         const hashedPassword = await bcrypt.hash(item.password, salt);
@@ -381,14 +402,14 @@ async function importKaryawan(req, res) {
         if (existing.length > 0) {
           // Update existing
           await db.query(
-            `UPDATE users SET nama = ?, role = ?, bidang_id = ?, jabatan = ?, sub_bidang = ? WHERE id = ?`,
-            [item.nama, item.role, bidangId, item.jabatan || null, item.subBidang || null, existing[0].id]
+            `UPDATE users SET nama = ?, role = ?, bidang_id = ?, jabatan = ?, sub_bidang = ?, can_patroli = ? WHERE id = ?`,
+            [item.nama, item.role, bidangId, item.jabatan || null, item.subBidang || null, canPatroli, existing[0].id]
           );
         } else {
           // Insert new
           await db.query(
-            `INSERT INTO users (nama, email, password, role, bidang_id, jabatan, sub_bidang) VALUES (?, ?, ?, ?, ?, ?, ?)`,
-            [item.nama, item.email, hashedPassword, item.role, bidangId, item.jabatan || null, item.subBidang || null]
+            `INSERT INTO users (nama, email, password, role, bidang_id, jabatan, sub_bidang, can_patroli) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+            [item.nama, item.email, hashedPassword, item.role, bidangId, item.jabatan || null, item.subBidang || null, canPatroli]
           );
         }
         importedCount++;

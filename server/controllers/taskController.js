@@ -76,8 +76,8 @@ async function getTasks(req, res) {
     }
     // SUPER_ADMIN, MUDIR and legacy WAKIL_MUDIR can view all tasks.
 
-    // Period filter (PRD 3.2: HARIAN, PEKANAN, BULANAN, TAHUNAN)
-    if (periode && ['HARIAN', 'PEKANAN', 'BULANAN', 'TAHUNAN'].includes(periode.toUpperCase())) {
+    // Period filter (PRD 3.2: HARIAN, PEKANAN, BULANAN, TAHUNAN, INSIDENTAL)
+    if (periode && ['HARIAN', 'PEKANAN', 'BULANAN', 'TAHUNAN', 'INSIDENTAL'].includes(periode.toUpperCase())) {
       query += ' AND t.periode = ?';
       params.push(periode.toUpperCase());
     }
@@ -617,5 +617,6 @@ module.exports = {
   submitReview,
   reviewTask,
   deleteTask,
-  deleteTasks
+  deleteTasks,
+  parseHolidayExclusions
 };
