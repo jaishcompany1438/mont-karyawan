@@ -8,6 +8,15 @@ import ReviewModal from '../components/ReviewModal';
 import MobileTaskGroups from '../components/MobileTaskGroups';
 import { LayoutGrid, List, Search } from 'lucide-react';
 
+const MOBILE_STATUS_FILTERS = [
+  ['', 'Semua'],
+  ['TO_DO', 'Belum mulai'],
+  ['IN_PROGRESS', 'Sedang dikerjakan'],
+  ['UNDER_REVIEW', 'Menunggu review'],
+  ['REVISION', 'Perlu revisi'],
+  ['COMPLETED', 'Selesai']
+];
+
 export default function Tasks({ refreshKey, onRefresh, onOpenCreateTask, onOpenEditTask, onOpenSubmitWork, initialFilters = {} }) {
   const { user } = useAuth();
   const [period, setPeriod] = useState(initialFilters.periode || '');
@@ -56,6 +65,22 @@ export default function Tasks({ refreshKey, onRefresh, onOpenCreateTask, onOpenE
       {error && <div className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs text-rose-700">{error}</div>}
       <PeriodTabs selectedPeriod={period} onChange={setPeriod} />
       <div className="flex flex-wrap items-center justify-between gap-3"><label className="flex min-w-[220px] flex-1 items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-400"><Search className="h-4 w-4" /><input className="w-full outline-none" placeholder="Cari judul, deskripsi, atau penerima..." value={search} onChange={(e) => setSearch(e.target.value)} /></label><div className="flex gap-2"><button onClick={() => setFiltersOpen((value) => !value)} className={`rounded-xl border px-3 py-2 text-xs font-bold ${filtersOpen ? 'border-emerald-300 bg-emerald-50 text-emerald-700' : 'border-slate-200 bg-white text-slate-600'}`}>Filter Detail</button><div className="flex rounded-xl border border-slate-200 bg-white p-1"><button onClick={() => setView('kanban')} className={`rounded-lg p-2 ${view === 'kanban' ? 'bg-emerald-100 text-emerald-700' : 'text-slate-500'}`}><LayoutGrid className="h-4 w-4" /></button><button onClick={() => setView('table')} className={`rounded-lg p-2 ${view === 'table' ? 'bg-emerald-100 text-emerald-700' : 'text-slate-500'}`}><List className="h-4 w-4" /></button></div></div></div>
+      <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1 md:hidden" aria-label="Filter status tugas">
+        {MOBILE_STATUS_FILTERS.map(([value, label]) => (
+          <button
+            key={value || 'all'}
+            type="button"
+            onClick={() => setStatus(value)}
+            className={`shrink-0 whitespace-nowrap rounded-full border px-3 py-2 text-[11px] font-bold transition ${
+              status === value
+                ? 'border-emerald-600 bg-emerald-700 text-white shadow-sm'
+                : 'border-slate-200 bg-white text-slate-600 hover:border-emerald-300 hover:bg-emerald-50 hover:text-emerald-700'
+            }`}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
       {filtersOpen && <div className="grid gap-2 rounded-2xl border border-slate-200 bg-white p-3 sm:grid-cols-2 lg:grid-cols-5"><select value={status} onChange={(e) => setStatus(e.target.value)} className="rounded-xl border px-3 py-2 text-xs"><option value="">Semua status</option><option value="TO_DO">Belum mulai</option><option value="IN_PROGRESS">Sedang dikerjakan</option><option value="UNDER_REVIEW">Menunggu review</option><option value="REVISION">Perlu revisi</option><option value="COMPLETED">Selesai</option></select><select value={prioritas} onChange={(e) => setPrioritas(e.target.value)} className="rounded-xl border px-3 py-2 text-xs"><option value="">Semua prioritas</option><option>RENDAH</option><option>SEDANG</option><option>TINGGI</option><option>URGEN</option></select><select value={kategori} onChange={(e) => setKategori(e.target.value)} className="rounded-xl border px-3 py-2 text-xs"><option value="">Semua kategori</option><option>RUTIN</option><option>PROYEK</option><option>MENDADAK</option></select><select value={bidangId} onChange={(e) => setBidangId(e.target.value)} className="rounded-xl border px-3 py-2 text-xs"><option value="">Semua bidang</option>{bidang.map((item) => <option key={item.id} value={item.id}>{item.nama_bidang}</option>)}</select><select value={assignedTo} onChange={(e) => setAssignedTo(e.target.value)} className="rounded-xl border px-3 py-2 text-xs"><option value="">Semua penerima</option>{assignees.map((item) => <option key={item.id} value={item.id}>{item.nama}</option>)}</select></div>}
       <MobileTaskGroups tasks={tasks} onOpenSubmitWork={onOpenSubmitWork} onOpenReview={setReviewTask} onStartTask={(id) => updateStatus(id, 'IN_PROGRESS')} />
       {user?.role === 'SUPER_ADMIN' && selectedIds.length > 0 && <button onClick={deleteSelected} className="rounded-xl bg-rose-600 px-3 py-2 text-xs font-bold text-white">Hapus {selectedIds.length} terpilih</button>}
