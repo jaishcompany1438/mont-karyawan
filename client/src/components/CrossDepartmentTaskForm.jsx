@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../services/api';
+import SuccessToast from './SuccessToast';
 import { Send, Upload, AlertCircle, Building2, Calendar, FileText, CheckCircle2 } from 'lucide-react';
 
 export default function CrossDepartmentTaskForm({ departments = [], onSubmitSuccess, onCancel }) {
@@ -73,6 +74,8 @@ export default function CrossDepartmentTaskForm({ departments = [], onSubmitSucc
   };
 
   return (
+    <>
+    <SuccessToast message={successMsg} onClose={() => setSuccessMsg('')} />
     <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
       <div className="mb-5 border-b border-slate-100 pb-3">
         <h3 className="flex items-center gap-2 text-base font-bold text-slate-800">
@@ -220,6 +223,6 @@ export default function CrossDepartmentTaskForm({ departments = [], onSubmitSucc
         </div>
       </form>
     </div>
+    </>
   );
 }
-

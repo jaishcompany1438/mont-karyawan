@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../services/api';
-import { X, Upload, Calendar, User, Flag, Clock } from 'lucide-react';
+import { X, Upload, Calendar, User, Flag, Clock, CheckCircle2 } from 'lucide-react';
+import SuccessToast from './SuccessToast';
 
 export default function TaskModal({ isOpen, onClose, onSuccess, initialTask = null }) {
   const [judul, setJudul] = useState('');
@@ -17,12 +18,18 @@ export default function TaskModal({ isOpen, onClose, onSuccess, initialTask = nu
   const [holidayDate, setHolidayDate] = useState('');
   const holidayOptions = [
     ['SATURDAY', 'Sabtu'],
-    ['SUNDAY', 'Minggu']
+    ['SUNDAY', 'Minggu'],
+    ['FRIDAY', 'Jumat'],
+    ['THURSDAY', 'Kamis'],
+    ['WEDNESDAY', 'Rabu'],
+    ['TUESDAY', 'Selasa'],
+    ['MONDAY', 'Senin'],
   ];
 
   const [assignees, setAssignees] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
 
   useEffect(() => {
     if (isOpen) {
@@ -64,6 +71,7 @@ export default function TaskModal({ isOpen, onClose, onSuccess, initialTask = nu
         setHolidayDate('');
       }
       setError('');
+      setSuccess('');
     }
   }, [isOpen, initialTask]);
 
@@ -116,18 +124,21 @@ export default function TaskModal({ isOpen, onClose, onSuccess, initialTask = nu
         await api.createTask(formData);
       }
 
+      setSuccess(initialTask ? 'Perubahan tugas berhasil disimpan.' : 'Tugas baru berhasil dibuat.');
       onSuccess();
-      onClose();
+      window.setTimeout(onClose, 900);
     } catch (err) {
       setError(err.message || 'Gagal menyimpan tugas.');
     } finally {
       setLoading(false);
     }
   };
-
+//---------------------------------------
   return (
+    <>
+    <SuccessToast message={success} onClose={() => setSuccess('')} />
     <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
-      <div className="bg-white rounded-3xl max-w-xl w-full shadow-2xl border border-slate-200 overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+      <div className="flex max-h-[calc(100vh-2rem)] w-full max-w-xl flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl animate-in fade-in zoom-in-95 duration-150">
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-slate-50/50">
           <div>
             <h3 className="text-base font-bold text-slate-900">
@@ -145,7 +156,8 @@ export default function TaskModal({ isOpen, onClose, onSuccess, initialTask = nu
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-6 space-y-4 text-xs">
+        <form id="task-form" onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col">
+          <div className="min-h-0 flex-1 overflow-y-auto p-6 space-y-4 text-xs">
           {error && (
             <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-rose-700 font-medium">
               {error}
@@ -309,8 +321,14 @@ export default function TaskModal({ isOpen, onClose, onSuccess, initialTask = nu
               className="w-full text-xs text-slate-500 file:mr-3 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-emerald-50 file:text-emerald-700 hover:file:bg-emerald-100"
             />
           </div>
+          </div>
 
-          <div className="flex items-center justify-end space-x-2 pt-4 border-t border-slate-100">
+          <div className="flex shrink-0 items-center justify-end space-x-2 border-t border-slate-100 bg-white px-6 py-4">
+            {success && (
+              <span className="mr-auto flex items-center gap-1.5 text-xs font-semibold text-emerald-700">
+                <CheckCircle2 className="h-4 w-4" />{success}
+              </span>
+            )}
             <button
               type="button"
               onClick={onClose}
@@ -329,5 +347,6 @@ export default function TaskModal({ isOpen, onClose, onSuccess, initialTask = nu
         </form>
       </div>
     </div>
+    </>
   );
 }

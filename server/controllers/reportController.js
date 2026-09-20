@@ -381,7 +381,7 @@ function getReportSummary(rows, aggregatedRows, filters) {
   };
 }
 
-function createReportPdf(rows, filters) {
+function createReportPdf(rows, filters, ownerName = '') {
   const selected = String(filters.selected_columns || 'judul,periode')
     .split(',')
     .map((column) => column.trim())
@@ -410,6 +410,8 @@ function createReportPdf(rows, filters) {
     const pageWidth = landscape ? 841.89 : 595.28;
     const pageHeight = landscape ? 595.28 : 841.89;
     const margin = 42;
+    const signatureHeight = 92;
+    const signatureTop = pageHeight - margin - signatureHeight;
     const contentWidth = pageWidth - margin * 2;
     const green = '#047857';
     const lightGreen = '#ECFDF5';
@@ -479,6 +481,29 @@ function createReportPdf(rows, filters) {
       return y + 30;
     };
 
+    const drawSignatures = () => {
+      const gap = 28;
+      const boxWidth = (contentWidth - gap) / 2;
+      const leftX = margin;
+      const rightX = margin + boxWidth + gap;
+      const lineY = signatureTop + 42;
+      doc.fillColor('#0F172A').font('Helvetica').fontSize(9)
+        .text('Pemilik Laporan', leftX, signatureTop, { width: boxWidth, align: 'center' })
+        .text('Pemeriksa', rightX, signatureTop, { width: boxWidth, align: 'center' });
+      doc.strokeColor('#64748B').lineWidth(0.6)
+        .moveTo(leftX + 18, lineY).lineTo(leftX + boxWidth - 18, lineY).stroke()
+        .moveTo(rightX + 18, lineY).lineTo(rightX + boxWidth - 18, lineY).stroke();
+      doc.fillColor('#0F172A').font('Helvetica-Bold').fontSize(9)
+        .text(ownerName || '____________________________', leftX, lineY + 7, {
+          width: boxWidth,
+          align: 'center'
+        })
+        .text('', rightX, lineY + 7, {
+          width: boxWidth,
+          align: 'center'
+        });
+    };
+
     const getRowHeight = (row) => {
       const heights = columns.map((column) => doc.heightOfString(column.value(row, 0), {
         width: Math.max(20, column.width - 16),
@@ -520,7 +545,7 @@ function createReportPdf(rows, filters) {
       doc.fillColor(muted).font('Helvetica').fontSize(9).text('Tidak ada data pada periode ini.', margin + 10, y + 14);
       y += 38;
     }
-    if (y + 48 > pageHeight - 42) {
+    if (y + 53 > signatureTop - 12) {
       y = drawHeader();
     }
     doc.save().roundedRect(margin, y + 18, contentWidth, 35, 8).fill(lightGreen).restore();
@@ -531,6 +556,7 @@ function createReportPdf(rows, filters) {
       width: 158,
       align: 'right'
     });
+    drawSignatures();
     doc.end();
   });
 }
@@ -538,7 +564,7 @@ function createReportPdf(rows, filters) {
 async function exportPdfReport(req, res) {
   try {
     const rows = await getReportRows(req);
-    const pdf = await createReportPdf(rows, req.query);
+    const pdf = await createReportPdf(rows, req.query, req.user.nama);
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `attachment; filename="rekap_kinerja_${Date.now()}.pdf"`);
     return res.send(pdf);
