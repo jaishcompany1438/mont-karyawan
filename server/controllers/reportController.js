@@ -448,7 +448,7 @@ function createReportPdf(rows, filters, ownerName = '') {
     let cursor = margin;
     const columns = selectedColumns.map((key) => {
       const definition = columnDefinitions[key];
-      const column = { ...definition, x: cursor, width: definition.width * widthScale };
+      const column = { key, ...definition, x: cursor, width: definition.width * widthScale };
       cursor += column.width;
       return column;
     });
@@ -552,12 +552,12 @@ function createReportPdf(rows, filters, ownerName = '') {
       columns.forEach((column, columnIndex) => {
         const value = column.value(row, index);
         if (column.key === 'periode' && row.periode === 'TAHUNAN') {
-          doc.save().rect(column.x, y, column.width, rowHeight).fill('#DCFCE7').restore();
+          doc.save().rect(column.x, y, column.width, rowHeight).fill('#b5f7cc').restore();
         } else if (column.key === 'periode' && row.periode === 'INSIDENTAL') {
-          doc.save().rect(column.x, y, column.width, rowHeight).fill('#FEF3C7').restore();
+          doc.save().rect(column.x, y, column.width, rowHeight).fill('#fff0b2').restore();
         }
         const textColor = column.key === 'periode' && row.periode === 'TAHUNAN'
-          ? '#166534'
+          ? '#104926'
           : column.key === 'periode' && row.periode === 'INSIDENTAL'
             ? '#92400E'
             : '#1E293B';
