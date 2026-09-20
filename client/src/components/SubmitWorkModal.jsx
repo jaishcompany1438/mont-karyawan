@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { api } from '../services/api';
 import { X, Upload, CheckCircle } from 'lucide-react';
 import SuccessToast from './SuccessToast';
@@ -10,6 +10,20 @@ export default function SubmitWorkModal({ isOpen, onClose, onSuccess, task }) {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [anggaranTerpakai, setAnggaranTerpakai] = useState('0');
+  const [kendala, setKendala] = useState('');
+  const [solusi, setSolusi] = useState('');
+
+  useEffect(() => {
+    if (isOpen) {
+      setKeterangan('');
+      setFile(null);
+      setAnggaranTerpakai('0');
+      setKendala('');
+      setSolusi('');
+      setError('');
+      setSuccess('');
+    }
+  }, [isOpen, task?.id]);
 
   if (!isOpen || !task) return null;
 
@@ -27,6 +41,8 @@ export default function SubmitWorkModal({ isOpen, onClose, onSuccess, task }) {
       const formData = new FormData();
       if (file) formData.append('bukti_kerja', file);
       if (keterangan) formData.append('keterangan', keterangan.trim());
+      formData.append('kendala', kendala.trim());
+      formData.append('solusi', solusi.trim());
       formData.append('anggaran_terpakai', anggaranTerpakai);
 
       await api.submitReview(task.id, formData);
@@ -92,6 +108,28 @@ export default function SubmitWorkModal({ isOpen, onClose, onSuccess, task }) {
               type="file"
               onChange={(e) => setFile(e.target.files[0] || null)}
               className="w-full text-xs text-slate-500 file:mr-3 file:py-2.5 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-emerald-50 file:text-emerald-700 hover:file:bg-emerald-100 border border-slate-200 rounded-xl"
+            />
+          </div>
+
+          <div>
+            <label className="block font-bold text-slate-700 mb-1">Kendala (Opsional)</label>
+            <textarea
+              rows="2"
+              value={kendala}
+              onChange={(e) => setKendala(e.target.value)}
+              placeholder="Tuliskan kendala yang ditemukan selama pelaksanaan tugas..."
+              className="w-full rounded-xl border border-slate-300 px-3.5 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+            />
+          </div>
+
+          <div>
+            <label className="block font-bold text-slate-700 mb-1">Solusi (Opsional)</label>
+            <textarea
+              rows="2"
+              value={solusi}
+              onChange={(e) => setSolusi(e.target.value)}
+              placeholder="Tuliskan solusi atau tindak lanjut yang dilakukan..."
+              className="w-full rounded-xl border border-slate-300 px-3.5 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500"
             />
           </div>
 

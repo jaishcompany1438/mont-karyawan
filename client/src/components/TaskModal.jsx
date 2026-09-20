@@ -321,6 +321,7 @@ export default function TaskModal({ isOpen, onClose, onSuccess, initialTask = nu
               className="w-full text-xs text-slate-500 file:mr-3 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-emerald-50 file:text-emerald-700 hover:file:bg-emerald-100"
             />
           </div>
+
           </div>
 
           <div className="flex shrink-0 items-center justify-end space-x-2 border-t border-slate-100 bg-white px-6 py-4">

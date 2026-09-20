@@ -8,6 +8,7 @@ const OPTIONAL_COLUMNS = [
   ['total_anggaran', 'Total Anggaran'],
   ['sisa_saldo', 'Sisa Saldo'],
   ['catatan_tugas', 'Catatan Tugas'],
+  ['kendala_solusi', 'Kendala dan Solusi'],
   ['catatan_reviewer', 'Catatan Reviewer'],
   ['penilaian', 'Penilaian (Rata-rata)']
 ];
@@ -102,7 +103,7 @@ export default function ExportReportModal({ isOpen, onClose, filters = {} }) {
           <label className="text-xs font-semibold text-slate-700">Sampai tanggal<input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="mt-1 w-full rounded-lg border px-2 py-2 text-xs" /></label>
         </div>
         <fieldset className="mt-4 rounded-xl border border-slate-200 p-3">
-          <legend className="px-1 text-xs font-bold text-slate-700">Kolom PDF</legend>
+          <legend className="px-1 text-xs font-bold text-slate-700">Kolom Laporan</legend>
           <div className="grid grid-cols-2 gap-2 text-xs">
             <label className="flex items-center gap-2 text-slate-500"><input type="checkbox" checked disabled className="accent-emerald-700" />Judul Tugas (wajib)</label>
             <label className="flex items-center gap-2 text-slate-500"><input type="checkbox" checked disabled className="accent-emerald-700" />Periode (wajib)</label>

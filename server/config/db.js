@@ -91,6 +91,8 @@ async function initDB() {
         recurrence_parent_id INT NULL,
         recurrence_generated_at DATETIME NULL,
         file_attachment VARCHAR(255) NULL,
+        kendala TEXT NULL,
+        solusi TEXT NULL,
         bukti_kerja VARCHAR(255) NULL,
         catatan_revisi TEXT NULL,
         catatan_reviewer TEXT NULL,
@@ -170,6 +172,8 @@ async function initDB() {
       ['tasks', 'nilai_waktu', 'ALTER TABLE tasks ADD COLUMN nilai_waktu DECIMAL(3,1) NULL AFTER nilai_sop'],
       ['tasks', 'nilai_kualitas', 'ALTER TABLE tasks ADD COLUMN nilai_kualitas DECIMAL(3,1) NULL AFTER nilai_waktu'],
       ['tasks', 'libur_pengecualian', 'ALTER TABLE tasks ADD COLUMN libur_pengecualian TEXT NULL AFTER nilai_kualitas']
+      ,['tasks', 'kendala', 'ALTER TABLE tasks ADD COLUMN kendala TEXT NULL AFTER file_attachment']
+      ,['tasks', 'solusi', 'ALTER TABLE tasks ADD COLUMN solusi TEXT NULL AFTER kendala']
       ,['users', 'can_patroli', 'ALTER TABLE users ADD COLUMN can_patroli TINYINT(1) NOT NULL DEFAULT 0 AFTER no_telepon']
     ];
     for (const [table, column, statement] of migrations) {
