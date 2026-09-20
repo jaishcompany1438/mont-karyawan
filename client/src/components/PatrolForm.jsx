@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Camera, CheckCircle2 } from 'lucide-react';
 import { api } from '../services/api';
+import SuccessToast from './SuccessToast';
 
 const PARAMETERS = [
   ['kebersihan', 'Kebersihan'],
@@ -87,6 +88,8 @@ export default function PatrolForm({ onSuccess, canManageRooms = false }) {
   };
 
   return (
+    <>
+    <SuccessToast message={success} onClose={() => setSuccess('')} />
     <form onSubmit={submit} className="rounded-3xl border border-emerald-100 bg-white p-5 shadow-sm sm:p-6">
       <div className="mb-5 flex items-start justify-between gap-3">
         <div><p className="text-xs font-bold uppercase tracking-wider text-emerald-700">Input inspeksi</p><h3 className="mt-1 text-lg font-extrabold text-slate-900">Catat Patroli Fasilitas</h3></div>
@@ -124,5 +127,6 @@ export default function PatrolForm({ onSuccess, canManageRooms = false }) {
       </label>
       <button disabled={loading} className="mt-5 w-full rounded-xl bg-emerald-700 px-4 py-3 text-xs font-bold text-white shadow-lg shadow-emerald-700/20 transition hover:bg-emerald-600 disabled:opacity-50">{loading ? 'Menyimpan...' : 'Simpan Hasil Patroli'}</button>
     </form>
+    </>
   );
 }

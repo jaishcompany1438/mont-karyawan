@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { api } from '../services/api';
 import { X, CheckCircle, RotateCcw, Paperclip, FileText, User } from 'lucide-react';
+import SuccessToast from './SuccessToast';
 
 export default function ReviewModal({ isOpen, onClose, onSuccess, task }) {
   const [catatanRevisi, setCatatanRevisi] = useState('');
@@ -8,6 +9,7 @@ export default function ReviewModal({ isOpen, onClose, onSuccess, task }) {
   const [ratings, setRatings] = useState({ sop: '3', waktu: '3', kualitas: '3' });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
 
   useEffect(() => {
     if (isOpen && task) {
@@ -19,6 +21,7 @@ export default function ReviewModal({ isOpen, onClose, onSuccess, task }) {
         kualitas: String(task.nilai_kualitas ?? '3')
       });
       setError('');
+      setSuccess('');
     }
   }, [isOpen, task]);
 
@@ -47,8 +50,9 @@ export default function ReviewModal({ isOpen, onClose, onSuccess, task }) {
         nilai_kualitas: ratings.kualitas
       });
 
+      setSuccess(action === 'APPROVE' ? 'Tugas berhasil disetujui.' : 'Tugas berhasil dikirim untuk revisi.');
       onSuccess();
-      onClose();
+      window.setTimeout(onClose, 900);
     } catch (err) {
       setError(err.message || 'Gagal memproses verifikasi.');
     } finally {
@@ -57,6 +61,8 @@ export default function ReviewModal({ isOpen, onClose, onSuccess, task }) {
   };
 
   return (
+    <>
+    <SuccessToast message={success} onClose={() => setSuccess('')} />
     <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
       <div className="bg-white rounded-3xl max-w-xl w-full shadow-2xl border border-slate-200 overflow-hidden animate-in fade-in zoom-in-95 duration-150">
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-slate-50/50">
@@ -201,5 +207,6 @@ export default function ReviewModal({ isOpen, onClose, onSuccess, task }) {
         </div>
       </div>
     </div>
+    </>
   );
 }

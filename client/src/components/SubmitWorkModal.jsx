@@ -1,12 +1,14 @@
 import React, { useState } from 'react';
 import { api } from '../services/api';
 import { X, Upload, CheckCircle } from 'lucide-react';
+import SuccessToast from './SuccessToast';
 
 export default function SubmitWorkModal({ isOpen, onClose, onSuccess, task }) {
   const [keterangan, setKeterangan] = useState('');
   const [file, setFile] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
   const [anggaranTerpakai, setAnggaranTerpakai] = useState('0');
 
   if (!isOpen || !task) return null;
@@ -28,8 +30,9 @@ export default function SubmitWorkModal({ isOpen, onClose, onSuccess, task }) {
       formData.append('anggaran_terpakai', anggaranTerpakai);
 
       await api.submitReview(task.id, formData);
+      setSuccess('Bukti kerja berhasil dikirim untuk direview.');
       onSuccess();
-      onClose();
+      window.setTimeout(onClose, 900);
     } catch (err) {
       setError(err.message || 'Gagal mengirimkan bukti kerja.');
     } finally {
@@ -38,6 +41,8 @@ export default function SubmitWorkModal({ isOpen, onClose, onSuccess, task }) {
   };
 
   return (
+    <>
+    <SuccessToast message={success} onClose={() => setSuccess('')} />
     <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
       <div className="bg-white rounded-3xl max-w-lg w-full shadow-2xl border border-slate-200 overflow-hidden animate-in fade-in zoom-in-95 duration-150">
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-slate-50/50">
@@ -124,5 +129,6 @@ export default function SubmitWorkModal({ isOpen, onClose, onSuccess, task }) {
         </form>
       </div>
     </div>
+    </>
   );
 }

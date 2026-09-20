@@ -75,7 +75,7 @@ async function getAssignees(req, res) {
       query += ' AND u.id != ?';
       params.push(id);
     } else if (role === 'WADIR_PEND' || role === 'WADIR_PENGS') {
-      query += ' AND u.role = \'KABID\' AND b.parent_role = ?';
+      query += ' AND u.role IN (\'KABID\', \'STAF\') AND b.parent_role = ?';
       params.push(role);
     } else if (role === 'WAKIL_MUDIR') {
       return res.json({ success: true, data: [] });

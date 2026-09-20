@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { api } from '../services/api';
 import { useAuth } from '../context/AuthContext';
+import SuccessToast from './SuccessToast';
 import {
   X,
   FileSpreadsheet,
@@ -18,6 +19,7 @@ export default function ExcelUploadModal({ isOpen, onClose, onSuccess }) {
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
   const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
 
   if (!isOpen) return null;
 
@@ -38,6 +40,7 @@ export default function ExcelUploadModal({ isOpen, onClose, onSuccess }) {
     setFile(null);
     setResult(null);
     setError('');
+    setSuccess('');
   };
 
   const handleDownloadTemplate = () => {
@@ -59,6 +62,7 @@ export default function ExcelUploadModal({ isOpen, onClose, onSuccess }) {
 
       const res = await api.importFile(currentTab.endpoint, file);
       setResult(res);
+      setSuccess(res.message || 'Data berhasil diimpor.');
       if (res.importedCount > 0 && onSuccess) {
         onSuccess();
       }
@@ -70,6 +74,8 @@ export default function ExcelUploadModal({ isOpen, onClose, onSuccess }) {
   };
 
   return (
+    <>
+    <SuccessToast message={success} onClose={() => setSuccess('')} />
     <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
       <div className="bg-white rounded-3xl max-w-xl w-full shadow-2xl border border-slate-200 overflow-hidden animate-in fade-in zoom-in-95 duration-150">
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-slate-50/50">
@@ -209,5 +215,6 @@ export default function ExcelUploadModal({ isOpen, onClose, onSuccess }) {
         </div>
       </div>
     </div>
+    </>
   );
 }

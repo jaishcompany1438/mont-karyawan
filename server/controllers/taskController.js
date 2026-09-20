@@ -234,8 +234,8 @@ async function createTask(req, res) {
       return res.status(403).json({ success: false, message: 'Role Wakil Mudir lama tidak memiliki cabang. Gunakan WADIR_PEND atau WADIR_PENGS.' });
     } else if (role === 'WADIR_PEND' || role === 'WADIR_PENGS') {
       const [branchRows] = await db.query('SELECT parent_role FROM bidang WHERE id = ?', [assignee.bidang_id]);
-      if (assignee.role !== 'KABID' || !branchRows[0] || branchRows[0].parent_role !== role) {
-        return res.status(403).json({ success: false, message: 'Wadir hanya dapat menugaskan kepada Kabid di bawah cabangnya.' });
+      if (!['KABID', 'STAF'].includes(assignee.role) || !branchRows[0] || branchRows[0].parent_role !== role) {
+        return res.status(403).json({ success: false, message: 'Wadir hanya dapat menugaskan kepada Kabid atau Staf di bawah cabangnya.' });
       }
     }
     // Mudir / Super Admin: bebas memilih siapa saja
@@ -355,8 +355,8 @@ async function updateTask(req, res) {
         `SELECT u.role, b.parent_role FROM users u LEFT JOIN bidang b ON u.bidang_id = b.id WHERE u.id = ?`,
         [assigned_to || task.assigned_to]
       );
-      if (!candidate[0] || candidate[0].role !== 'KABID' || candidate[0].parent_role !== role) {
-        return res.status(403).json({ success: false, message: 'Wadir hanya dapat menugaskan ke Kabid di bawah cabangnya.' });
+      if (!candidate[0] || !['KABID', 'STAF'].includes(candidate[0].role) || candidate[0].parent_role !== role) {
+        return res.status(403).json({ success: false, message: 'Wadir hanya dapat menugaskan ke Kabid atau Staf di bawah cabangnya.' });
       }
     }
 
