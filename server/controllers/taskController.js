@@ -428,7 +428,7 @@ async function submitReview(req, res) {
   try {
     const { id } = req.params;
     const { id: userId } = req.user;
-    const { keterangan, anggaran_terpakai } = req.body;
+    const { keterangan, kendala, solusi, anggaran_terpakai } = req.body;
 
     const db = getPool();
     const [rows] = await db.query('SELECT t.*, b.parent_role FROM tasks t JOIN bidang b ON b.id = t.bidang_id WHERE t.id = ?', [id]);
@@ -458,8 +458,8 @@ async function submitReview(req, res) {
     }
 
     await db.query(
-      `UPDATE tasks SET status = 'UNDER_REVIEW', anggaran_terpakai = ?, bukti_kerja = COALESCE(?, bukti_kerja) WHERE id = ?`,
-      [spent, bukti_kerja, id]
+      `UPDATE tasks SET status = 'UNDER_REVIEW', anggaran_terpakai = ?, bukti_kerja = COALESCE(?, bukti_kerja), kendala = ?, solusi = ? WHERE id = ?`,
+      [spent, bukti_kerja, String(kendala || '').trim() || null, String(solusi || '').trim() || null, id]
     );
 
     // Notify task creator

@@ -210,7 +210,8 @@ async function exportExcelReport(req, res) {
       { header: 'Anggaran Terpakai', key: 'anggaran_terpakai', width: 20 },
       { header: 'Sisa Saldo', key: 'sisa_saldo', width: 18 },
       { header: 'Tenggat Waktu (Due Date)', key: 'due_date', width: 22 },
-      { header: 'Catatan Revisi', key: 'catatan_revisi', width: 30 }
+      { header: 'Catatan Revisi', key: 'catatan_revisi', width: 30 },
+      { header: 'Kendala dan Solusi', key: 'kendala_solusi', width: 38 }
     ];
 
     const headerRow = worksheet.getRow(1);
@@ -239,7 +240,8 @@ async function exportExcelReport(req, res) {
         anggaran_terpakai: Number(row.anggaran_terpakai || 0),
         sisa_saldo: Number(row.anggaran_dana || 0) - Number(row.anggaran_terpakai || 0),
         due_date: new Date(row.due_date).toLocaleString('id-ID'),
-        catatan_revisi: row.catatan_revisi || '-'
+        catatan_revisi: row.catatan_revisi || '-',
+        kendala_solusi: formatKendalaSolusi(row.kendala, row.solusi)
       });
     });
 
@@ -255,6 +257,15 @@ async function exportExcelReport(req, res) {
 
 function formatPdfCurrency(value) {
   return `Rp ${Number(value || 0).toLocaleString('id-ID')}`;
+}
+
+function formatKendalaSolusi(kendala, solusi) {
+  const sections = [];
+  const issue = String(kendala || '').trim();
+  const resolution = String(solusi || '').trim();
+  if (issue) sections.push(`Kendala:\n${issue}`);
+  if (resolution) sections.push(`Solusi:\n${resolution}`);
+  return sections.join('\n\n') || '-';
 }
 
 function getReportLogo() {
@@ -318,6 +329,8 @@ function aggregateReportRows(rows, filters = {}) {
         totalSpent: 0,
         taskNotes: [],
         reviewerNotes: [],
+        kendalaNotes: [],
+        solusiNotes: [],
         ratings: []
       };
     }
@@ -330,6 +343,10 @@ function aggregateReportRows(rows, filters = {}) {
     const reviewerNote = String(row.catatan_reviewer || row.catatan_revisi || '').trim();
     if (taskNote) group.taskNotes.push(taskNote);
     if (reviewerNote) group.reviewerNotes.push(reviewerNote);
+    const kendala = String(row.kendala || '').trim();
+    const solusi = String(row.solusi || '').trim();
+    if (kendala) group.kendalaNotes.push(kendala);
+    if (solusi) group.solusiNotes.push(solusi);
     [row.nilai_sop, row.nilai_waktu, row.nilai_kualitas].forEach((value) => {
       if (value !== null && value !== undefined && value !== '') group.ratings.push(Number(value));
     });
@@ -346,6 +363,10 @@ function aggregateReportRows(rows, filters = {}) {
       remaining: group.totalBudget - group.totalSpent,
       catatan_tugas: [...new Set(group.taskNotes)].slice(-3).join('\n- '),
       catatan_reviewer: [...new Set(group.reviewerNotes)].slice(-3).join('\n- '),
+      kendala_solusi: formatKendalaSolusi(
+        [...new Set(group.kendalaNotes)].slice(-3).join('\n- '),
+        [...new Set(group.solusiNotes)].slice(-3).join('\n- ')
+      ),
       penilaian: group.ratings.length
         ? (group.ratings.reduce((sum, value) => sum + value, 0) / group.ratings.length).toFixed(1)
         : '-'
@@ -386,7 +407,7 @@ function createReportPdf(rows, filters, ownerName = '') {
     .split(',')
     .map((column) => column.trim())
     .filter(Boolean);
-  const allowedColumns = ['judul', 'periode', 'progress', 'total_anggaran', 'sisa_saldo', 'catatan_tugas', 'catatan_reviewer', 'penilaian'];
+  const allowedColumns = ['judul', 'periode', 'progress', 'total_anggaran', 'sisa_saldo', 'catatan_tugas', 'kendala_solusi', 'catatan_reviewer', 'penilaian'];
   const selectedColumns = [...new Set(['judul', 'periode', ...selected.filter((column) => allowedColumns.includes(column))])];
   const columnDefinitions = {
     judul: { label: 'Judul Tugas', width: 190, value: (row, index) => `${index + 1}. ${row.judul || '-'}` },
@@ -395,6 +416,7 @@ function createReportPdf(rows, filters, ownerName = '') {
     total_anggaran: { label: 'Total Anggaran', width: 92, value: (row) => formatPdfCurrency(row.totalBudget), align: 'right' },
     sisa_saldo: { label: 'Sisa Saldo', width: 92, value: (row) => formatPdfCurrency(row.remaining), align: 'right' },
     catatan_tugas: { label: 'Catatan Tugas', width: 130, value: (row) => row.catatan_tugas || '-' },
+    kendala_solusi: { label: 'Kendala dan Solusi', width: 145, value: (row) => row.kendala_solusi || '-' },
     catatan_reviewer: { label: 'Catatan Reviewer', width: 130, value: (row) => row.catatan_reviewer || '-' },
     penilaian: { label: 'Penilaian', width: 65, value: (row) => row.penilaian || '-', align: 'right' }
   };
@@ -446,7 +468,7 @@ function createReportPdf(rows, filters, ownerName = '') {
       doc.fillColor(muted).font('Helvetica').fontSize(9)
         .text(`Periode: ${filters.start_date || '-'} s/d ${filters.end_date || '-'}`, textX, y + 43);
       y += 78;
-      doc.fillColor(muted).font('Helvetica-Bold').fontSize(9).text('KABID :', margin, y);
+      doc.fillColor(muted).font('Helvetica-Bold').fontSize(9).text('Pemilik Laporan :', margin, y);
       doc.fillColor('#0F172A').font('Helvetica').fontSize(11).text(bidangName, margin, y + 14);
       return y + 42;
     };
@@ -529,7 +551,17 @@ function createReportPdf(rows, filters, ownerName = '') {
       doc.strokeColor(border).lineWidth(0.45).moveTo(margin, y + rowHeight).lineTo(margin + contentWidth, y + rowHeight).stroke();
       columns.forEach((column, columnIndex) => {
         const value = column.value(row, index);
-        doc.fillColor('#1E293B').font('Helvetica')
+        if (column.key === 'periode' && row.periode === 'TAHUNAN') {
+          doc.save().rect(column.x, y, column.width, rowHeight).fill('#DCFCE7').restore();
+        } else if (column.key === 'periode' && row.periode === 'INSIDENTAL') {
+          doc.save().rect(column.x, y, column.width, rowHeight).fill('#FEF3C7').restore();
+        }
+        const textColor = column.key === 'periode' && row.periode === 'TAHUNAN'
+          ? '#166534'
+          : column.key === 'periode' && row.periode === 'INSIDENTAL'
+            ? '#92400E'
+            : '#1E293B';
+        doc.fillColor(textColor).font('Helvetica')
           .fontSize(columnIndex === 0 ? 8.5 : 8)
           .text(value, column.x + 8, y + 8, {
             width: column.width - 16,
