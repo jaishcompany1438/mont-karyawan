@@ -47,7 +47,7 @@ async function getTasks(req, res) {
     let query = `
       SELECT t.*,
              creator.nama AS creator_nama, creator.role AS creator_role,
-             assignee.nama AS assignee_nama, assignee.email AS assignee_email, assignee.no_telepon AS assignee_no_telepon, assignee.jabatan AS assignee_jabatan,
+             assignee.nama AS assignee_nama, assignee.role AS assignee_role, assignee.email AS assignee_email, assignee.no_telepon AS assignee_no_telepon, assignee.jabatan AS assignee_jabatan,
              assignee.sub_bidang AS assignee_sub_bidang,
              b.nama_bidang, b.kode_bidang, b.parent_role
       FROM tasks t
@@ -71,8 +71,7 @@ async function getTasks(req, res) {
       query += ' AND (b.parent_role = ? OR t.created_by = ? OR t.assigned_to = ?)';
       params.push(role, userId, userId);
     } else if (role === 'WAKIL_MUDIR') {
-      query += ' AND (t.created_by = ? OR t.assigned_to = ?)';
-      params.push(userId, userId);
+      // Wakil Mudir may monitor tasks across subordinate roles.
     }
     // SUPER_ADMIN, MUDIR and legacy WAKIL_MUDIR can view all tasks.
 
@@ -136,7 +135,7 @@ async function getTaskById(req, res) {
     const [rows] = await db.query(
       `SELECT t.*,
               creator.nama AS creator_nama, creator.role AS creator_role,
-              assignee.nama AS assignee_nama, assignee.email AS assignee_email, assignee.no_telepon AS assignee_no_telepon, assignee.jabatan AS assignee_jabatan,
+              assignee.nama AS assignee_nama, assignee.role AS assignee_role, assignee.email AS assignee_email, assignee.no_telepon AS assignee_no_telepon, assignee.jabatan AS assignee_jabatan,
               assignee.sub_bidang AS assignee_sub_bidang,
               b.nama_bidang, b.kode_bidang, b.parent_role
        FROM tasks t
@@ -161,9 +160,6 @@ async function getTaskById(req, res) {
     if ((role === 'WADIR_PEND' || role === 'WADIR_PENGS') &&
         task.created_by !== userId && task.assigned_to !== userId && task.parent_role !== role) {
       return res.status(403).json({ success: false, message: 'Anda tidak memiliki hak akses ke tugas di cabang ini.' });
-    }
-    if (role === 'WAKIL_MUDIR' && task.created_by !== userId && task.assigned_to !== userId) {
-      return res.status(403).json({ success: false, message: 'Role Wakil Mudir lama tidak memiliki akses lintas cabang.' });
     }
     if (role === 'KABID' && task.bidang_id !== bidang_id && task.created_by !== userId && task.assigned_to !== userId) {
       return res.status(403).json({ success: false, message: 'Anda tidak memiliki hak akses ke tugas di bidang lain.' });
@@ -312,12 +308,11 @@ async function updateTask(req, res) {
     }
     const task = rows[0];
 
-    // Check edit permission: creator, super_admin, mudir, or kabid of that bidang
+    // KABID uses the dedicated delegation endpoint and cannot edit task details.
     const canEdit =
       role === 'SUPER_ADMIN' ||
       role === 'MUDIR' ||
-      task.created_by === userId ||
-      (role === 'KABID' && task.bidang_id === userBidangId);
+      (task.created_by === userId && role !== 'KABID');
     const wadirEdit = (role === 'WADIR_PEND' || role === 'WADIR_PENGS') && task.parent_role === role;
 
     if (!canEdit && !wadirEdit) {
@@ -392,6 +387,59 @@ async function updateTask(req, res) {
   }
 }
 
+// PATCH /api/tasks/:id/delegate
+// KABID may only delegate a task created by themselves to a STAF in their own bidang.
+async function delegateTask(req, res) {
+  try {
+    const { id } = req.params;
+    const { assigned_to: assignedTo } = req.body;
+    const { id: userId, role, bidang_id: userBidangId } = req.user;
+
+    if (role !== 'KABID') {
+      return res.status(403).json({ success: false, message: 'Hanya KABID yang dapat menggunakan delegasi tugas ini.' });
+    }
+    if (!assignedTo) {
+      return res.status(400).json({ success: false, message: 'Staf penerima delegasi wajib dipilih.' });
+    }
+
+    const db = getPool();
+    const [tasks] = await db.query(
+      'SELECT id, judul, created_by, assigned_to, bidang_id FROM tasks WHERE id = ? LIMIT 1',
+      [id]
+    );
+    if (!tasks.length) {
+      return res.status(404).json({ success: false, message: 'Tugas tidak ditemukan.' });
+    }
+    const task = tasks[0];
+    if (task.bidang_id !== userBidangId || (task.created_by !== userId && task.assigned_to !== userId)) {
+      return res.status(403).json({ success: false, message: 'KABID hanya dapat mendelegasikan tugas yang berada di bawah tanggung jawabnya.' });
+    }
+
+    const [staffRows] = await db.query(
+      'SELECT id, nama, role, bidang_id FROM users WHERE id = ? LIMIT 1',
+      [assignedTo]
+    );
+    const staff = staffRows[0];
+    if (!staff || staff.role !== 'STAF' || staff.bidang_id !== userBidangId) {
+      return res.status(403).json({ success: false, message: 'Delegasi hanya dapat diberikan kepada Staf di bidang KABID.' });
+    }
+
+    await db.query('UPDATE tasks SET assigned_to = ? WHERE id = ?', [staff.id, id]);
+    await createNotification({
+      userId: staff.id,
+      judul: `Delegasi Tugas: ${task.judul}`,
+      pesan: `${req.user.nama} mendelegasikan tugas "${task.judul}" kepada Anda.`,
+      tipe: 'PERINTAH_ATASAN',
+      referenceId: task.id,
+      referenceType: 'tasks'
+    });
+
+    return res.json({ success: true, message: 'Tugas berhasil didelegasikan kepada Staf.' });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: 'Gagal mendelegasikan tugas: ' + error.message });
+  }
+}
+
 // PATCH /api/tasks/:id/status (e.g. TO_DO -> IN_PROGRESS)
 async function updateTaskStatus(req, res) {
   try {
@@ -416,7 +464,23 @@ async function updateTaskStatus(req, res) {
       return res.status(403).json({ success: false, message: 'Anda hanya dapat mengubah status tugas Anda sendiri.' });
     }
 
-    await db.query('UPDATE tasks SET status = ? WHERE id = ?', [status, id]);
+    if (status === 'IN_PROGRESS') {
+      await db.query(
+        `UPDATE tasks
+         SET status = ?, started_by = COALESCE(started_by, ?), started_at = COALESCE(started_at, NOW())
+         WHERE id = ?`,
+        [status, userId, id]
+      );
+    } else if (status === 'COMPLETED') {
+      await db.query(
+        `UPDATE tasks
+         SET status = ?, completed_by = ?, completed_at = NOW()
+         WHERE id = ?`,
+        [status, userId, id]
+      );
+    } else {
+      await db.query('UPDATE tasks SET status = ? WHERE id = ?', [status, id]);
+    }
     return res.json({ success: true, message: `Status tugas diperbarui menjadi ${status}.` });
   } catch (error) {
     return res.status(500).json({ success: false, message: 'Gagal memperbarui status tugas: ' + error.message });
@@ -458,8 +522,10 @@ async function submitReview(req, res) {
     }
 
     await db.query(
-      `UPDATE tasks SET status = 'UNDER_REVIEW', anggaran_terpakai = ?, bukti_kerja = COALESCE(?, bukti_kerja), kendala = ?, solusi = ? WHERE id = ?`,
-      [spent, bukti_kerja, String(kendala || '').trim() || null, String(solusi || '').trim() || null, id]
+      `UPDATE tasks SET status = 'UNDER_REVIEW', anggaran_terpakai = ?, bukti_kerja = COALESCE(?, bukti_kerja),
+       kendala = ?, solusi = ?, completed_by = COALESCE(completed_by, ?), completed_at = COALESCE(completed_at, NOW())
+       WHERE id = ?`,
+      [spent, bukti_kerja, String(kendala || '').trim() || null, String(solusi || '').trim() || null, req.user.id, id]
     );
 
     // Notify task creator
@@ -504,20 +570,29 @@ async function reviewTask(req, res) {
     }
 
     const db = getPool();
-    const [rows] = await db.query('SELECT * FROM tasks WHERE id = ?', [id]);
+    const [rows] = await db.query(
+      `SELECT t.*, creator.role AS creator_role, assignee.role AS assignee_role
+       FROM tasks t
+       JOIN users creator ON creator.id = t.created_by
+       JOIN users assignee ON assignee.id = t.assigned_to
+       WHERE t.id = ?`,
+      [id]
+    );
     if (rows.length === 0) {
       return res.status(404).json({ success: false, message: 'Tugas tidak ditemukan.' });
     }
     const task = rows[0];
 
-    // Authorization: Super Admin, Mudir, Wakil Mudir, task creator, or Kabid of the department
+    // A KABID reviews only staff work in their branch. Senior leadership reviews subordinate work.
     const [taskWithBranch] = await db.query('SELECT parent_role FROM bidang WHERE id = ?', [task.bidang_id]);
     task.parent_role = taskWithBranch[0] && taskWithBranch[0].parent_role;
     const canReview =
       role === 'SUPER_ADMIN' ||
-      role === 'MUDIR' ||
-      task.created_by === userId ||
-      (role === 'KABID' && task.bidang_id === userBidangId) ||
+      ['MUDIR', 'WAKIL_MUDIR'].includes(role) ||
+      (role === 'KABID' &&
+        task.bidang_id === userBidangId &&
+        task.assignee_role === 'STAF' &&
+        ['KABID', 'STAF'].includes(task.creator_role)) ||
       ((role === 'WADIR_PEND' || role === 'WADIR_PENGS') && task.parent_role === role);
 
     if (!canReview) {
@@ -531,8 +606,12 @@ async function reviewTask(req, res) {
     const notes = action === 'REJECT' ? catatan_revisi.trim() : null;
 
     await db.query(
-      `UPDATE tasks SET status = ?, catatan_revisi = ?, catatan_reviewer = ?, nilai_sop = ?, nilai_waktu = ?, nilai_kualitas = ? WHERE id = ?`,
-      [newStatus, notes, catatan_reviewer && catatan_reviewer.trim() ? catatan_reviewer.trim() : null, ratings.sop, ratings.waktu, ratings.kualitas, id]
+      `UPDATE tasks SET status = ?, catatan_revisi = ?, catatan_reviewer = ?, nilai_sop = ?, nilai_waktu = ?, nilai_kualitas = ?,
+       completed_by = CASE WHEN ? = 'COMPLETED' THEN COALESCE(completed_by, ?) ELSE completed_by END,
+       completed_at = CASE WHEN ? = 'COMPLETED' THEN NOW() ELSE completed_at END
+       WHERE id = ?`,
+      [newStatus, notes, catatan_reviewer && catatan_reviewer.trim() ? catatan_reviewer.trim() : null,
+        ratings.sop, ratings.waktu, ratings.kualitas, newStatus, userId, newStatus, id]
     );
 
     // Notify assignee
@@ -570,7 +649,7 @@ async function deleteTask(req, res) {
       return res.status(404).json({ success: false, message: 'Tugas tidak ditemukan.' });
     }
 
-    if (role !== 'SUPER_ADMIN' && role !== 'MUDIR' && rows[0].created_by !== userId) {
+    if (role === 'KABID' || (role !== 'SUPER_ADMIN' && role !== 'MUDIR' && rows[0].created_by !== userId)) {
       return res.status(403).json({ success: false, message: 'Anda tidak berhak menghapus tugas ini.' });
     }
 
@@ -613,6 +692,7 @@ module.exports = {
   getTaskById,
   createTask,
   updateTask,
+  delegateTask,
   updateTaskStatus,
   submitReview,
   reviewTask,

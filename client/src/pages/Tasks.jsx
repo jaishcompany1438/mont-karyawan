@@ -6,6 +6,7 @@ import KanbanBoard from '../components/KanbanBoard';
 import TaskTable from '../components/TaskTable';
 import ReviewModal from '../components/ReviewModal';
 import MobileTaskGroups from '../components/MobileTaskGroups';
+import DelegateTaskModal from '../components/DelegateTaskModal';
 import { LayoutGrid, List, Search } from 'lucide-react';
 
 const MOBILE_STATUS_FILTERS = [
@@ -34,6 +35,7 @@ export default function Tasks({ refreshKey, onRefresh, onOpenCreateTask, onOpenE
   const [assignees, setAssignees] = useState([]);
   const [bidang, setBidang] = useState([]);
   const [selectedIds, setSelectedIds] = useState([]);
+  const [delegateTask, setDelegateTask] = useState(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -82,12 +84,13 @@ export default function Tasks({ refreshKey, onRefresh, onOpenCreateTask, onOpenE
         ))}
       </div>
       {filtersOpen && <div className="grid gap-2 rounded-2xl border border-slate-200 bg-white p-3 sm:grid-cols-2 lg:grid-cols-5"><select value={status} onChange={(e) => setStatus(e.target.value)} className="rounded-xl border px-3 py-2 text-xs"><option value="">Semua status</option><option value="TO_DO">Belum mulai</option><option value="IN_PROGRESS">Sedang dikerjakan</option><option value="UNDER_REVIEW">Menunggu review</option><option value="REVISION">Perlu revisi</option><option value="COMPLETED">Selesai</option></select><select value={prioritas} onChange={(e) => setPrioritas(e.target.value)} className="rounded-xl border px-3 py-2 text-xs"><option value="">Semua prioritas</option><option>RENDAH</option><option>SEDANG</option><option>TINGGI</option><option>URGEN</option></select><select value={kategori} onChange={(e) => setKategori(e.target.value)} className="rounded-xl border px-3 py-2 text-xs"><option value="">Semua kategori</option><option>RUTIN</option><option>PROYEK</option><option>MENDADAK</option></select><select value={bidangId} onChange={(e) => setBidangId(e.target.value)} className="rounded-xl border px-3 py-2 text-xs"><option value="">Semua bidang</option>{bidang.map((item) => <option key={item.id} value={item.id}>{item.nama_bidang}</option>)}</select><select value={assignedTo} onChange={(e) => setAssignedTo(e.target.value)} className="rounded-xl border px-3 py-2 text-xs"><option value="">Semua penerima</option>{assignees.map((item) => <option key={item.id} value={item.id}>{item.nama}</option>)}</select></div>}
-      <MobileTaskGroups tasks={tasks} onOpenSubmitWork={onOpenSubmitWork} onOpenReview={setReviewTask} onStartTask={(id) => updateStatus(id, 'IN_PROGRESS')} />
+      <MobileTaskGroups tasks={tasks} onOpenSubmitWork={onOpenSubmitWork} onOpenReview={setReviewTask} onStartTask={(id) => updateStatus(id, 'IN_PROGRESS')} onOpenDelegate={setDelegateTask} />
       {user?.role === 'SUPER_ADMIN' && selectedIds.length > 0 && <button onClick={deleteSelected} className="rounded-xl bg-rose-600 px-3 py-2 text-xs font-bold text-white">Hapus {selectedIds.length} terpilih</button>}
       <div className="hidden md:block">
-        {view === 'kanban' ? <KanbanBoard tasks={tasks} onOpenEditTask={onOpenEditTask} onOpenSubmitWork={onOpenSubmitWork} onOpenReview={setReviewTask} onStartTask={(id) => updateStatus(id, 'IN_PROGRESS')} /> : <TaskTable tasks={tasks} selectedIds={selectedIds} onSelectionChange={setSelectedIds} onOpenEditTask={onOpenEditTask} onOpenSubmitWork={onOpenSubmitWork} onOpenReview={setReviewTask} onStartTask={(id) => updateStatus(id, 'IN_PROGRESS')} onDeleteTask={deleteTask} />}
+        {view === 'kanban' ? <KanbanBoard tasks={tasks} onOpenEditTask={onOpenEditTask} onOpenSubmitWork={onOpenSubmitWork} onOpenReview={setReviewTask} onStartTask={(id) => updateStatus(id, 'IN_PROGRESS')} /> : <TaskTable tasks={tasks} selectedIds={selectedIds} onSelectionChange={setSelectedIds} onOpenEditTask={onOpenEditTask} onOpenSubmitWork={onOpenSubmitWork} onOpenReview={setReviewTask} onOpenDelegate={setDelegateTask} onStartTask={(id) => updateStatus(id, 'IN_PROGRESS')} onDeleteTask={deleteTask} />}
       </div>
       <ReviewModal isOpen={Boolean(reviewTask)} task={reviewTask} onClose={() => setReviewTask(null)} onSuccess={onRefresh} />
+      <DelegateTaskModal isOpen={Boolean(delegateTask)} task={delegateTask} staff={assignees} onClose={() => setDelegateTask(null)} onSuccess={onRefresh} />
     </div>
   );
 }

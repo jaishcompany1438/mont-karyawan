@@ -84,8 +84,8 @@ export default function KanbanBoard({
                   const overdue = isOverdue(task.due_date, task.status);
                   const isAssignee = task.assigned_to === user?.id;
                   const canReview = ['SUPER_ADMIN', 'MUDIR', 'WAKIL_MUDIR', 'WADIR_PEND', 'WADIR_PENGS'].includes(role) ||
-                                    task.created_by === user?.id ||
-                                    (role === 'KABID' && task.bidang_id === user?.bidang_id);
+                                    (role === 'KABID' && task.bidang_id === user?.bidang_id
+                                      && task.assignee_role === 'STAF' && ['KABID', 'STAF'].includes(task.creator_role));
 
                   return (
                     <div

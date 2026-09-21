@@ -10,7 +10,8 @@ const OPTIONAL_COLUMNS = [
   ['catatan_tugas', 'Catatan Tugas'],
   ['kendala_solusi', 'Kendala dan Solusi'],
   ['catatan_reviewer', 'Catatan Reviewer'],
-  ['penilaian', 'Penilaian (Rata-rata)']
+  ['penilaian', 'Penilaian (Rata-rata)'],
+  ['pelaksana', 'Pelaksana']
 ];
 
 export default function ExportReportModal({ isOpen, onClose, filters = {} }) {

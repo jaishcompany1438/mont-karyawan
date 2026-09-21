@@ -94,6 +94,15 @@ export const api = {
     return handleResponse(res);
   },
 
+  async delegateTask(id, assigned_to) {
+    const res = await fetch(`${BASE_URL}/tasks/${id}/delegate`, {
+      method: 'PATCH',
+      headers: getHeaders(),
+      body: JSON.stringify({ assigned_to })
+    });
+    return handleResponse(res);
+  },
+
   async submitReview(id, formData) {
     const isFormData = formData instanceof FormData;
     const res = await fetch(`${BASE_URL}/tasks/${id}/submit-review`, {
