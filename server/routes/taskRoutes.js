@@ -5,6 +5,7 @@ const {
   getTaskById,
   createTask,
   updateTask,
+  delegateTask,
   updateTaskStatus,
   submitReview,
   reviewTask,
@@ -20,6 +21,7 @@ router.get('/', getTasks);
 router.get('/:id', getTaskById);
 router.post('/', upload.single('attachment'), createTask);
 router.put('/:id', upload.single('attachment'), updateTask);
+router.patch('/:id/delegate', delegateTask);
 router.patch('/:id/status', updateTaskStatus);
 router.post('/:id/submit-review', upload.single('bukti_kerja'), submitReview);
 router.post('/:id/review', reviewTask);

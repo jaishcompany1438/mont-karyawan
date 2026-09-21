@@ -19,6 +19,7 @@ export default function TaskTable({
   onOpenSubmitWork,
   onOpenReview,
   onOpenEditTask,
+  onOpenDelegate,
   onDeleteTask,
   onStartTask,
   selectedIds = [],
@@ -82,16 +83,24 @@ export default function TaskTable({
                 const isOverdue = task.status !== 'COMPLETED' && new Date(task.due_date) < new Date();
                 const isAssignee = task.assigned_to === user?.id;
                 const canReview = ['SUPER_ADMIN', 'MUDIR', 'WAKIL_MUDIR', 'WADIR_PEND', 'WADIR_PENGS'].includes(role) ||
-                                  task.created_by === user?.id ||
-                                  (role === 'KABID' && task.bidang_id === user?.bidang_id);
-                const canEdit = ['SUPER_ADMIN', 'MUDIR'].includes(role) || task.created_by === user?.id;
+                                  (role === 'KABID' && task.bidang_id === user?.bidang_id &&
+                                    task.assignee_role === 'STAF' && ['KABID', 'STAF'].includes(task.creator_role));
+                const canEdit = ['SUPER_ADMIN', 'MUDIR'].includes(role) || (task.created_by === user?.id && role !== 'KABID');
+                const canDelegate = role === 'KABID' &&
+                  task.bidang_id === user?.bidang_id &&
+                  (task.created_by === user?.id || task.assigned_to === user?.id);
 
                 return (
                   <tr key={task.id} className="hover:bg-slate-50/70 transition-colors">
                     <td className="py-3.5 px-2">{role === 'SUPER_ADMIN' && <input type="checkbox" checked={selectedIds.includes(task.id)} onChange={(e) => onSelectionChange(e.target.checked ? [...selectedIds, task.id] : selectedIds.filter((id) => id !== task.id))} />}</td>
                     {/* Title & Description */}
                     <td className="py-3.5 px-4 max-w-[260px]">
-                      <div className="font-bold text-slate-900 line-clamp-1">{task.judul}</div>
+                      <div className="group relative w-fit max-w-full">
+                        <div className="font-bold text-slate-900 line-clamp-1" title={task.judul}>{task.judul}</div>
+                        <div className="pointer-events-none invisible absolute bottom-full left-0 z-30 mb-2 w-max max-w-[360px] rounded-lg bg-slate-900 px-3 py-2 text-left text-xs font-medium leading-relaxed text-white opacity-0 shadow-xl transition group-hover:visible group-hover:opacity-100">
+                          {task.judul}
+                        </div>
+                      </div>
                       <div className="text-[10px] text-slate-500">Anggaran: Rp {Number(task.anggaran_dana || 0).toLocaleString('id-ID')} · Terpakai: Rp {Number(task.anggaran_terpakai || 0).toLocaleString('id-ID')}</div>
                       {task.deskripsi && (
                         <div className="text-[11px] text-slate-500 line-clamp-1 mt-0.5">
@@ -202,6 +211,16 @@ export default function TaskTable({
                             className="p-1 text-slate-400 hover:text-slate-700 rounded hover:bg-slate-100"
                           >
                             <Edit2 className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+
+                        {canDelegate && (
+                          <button
+                            onClick={() => onOpenDelegate(task)}
+                            title="Delegasikan ke Staf"
+                            className="rounded bg-emerald-50 px-2 py-1 text-[10px] font-bold text-emerald-700 hover:bg-emerald-100"
+                          >
+                            Delegasikan
                           </button>
                         )}
 

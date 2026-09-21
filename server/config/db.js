@@ -93,6 +93,10 @@ async function initDB() {
         file_attachment VARCHAR(255) NULL,
         kendala TEXT NULL,
         solusi TEXT NULL,
+        started_by INT NULL,
+        started_at DATETIME NULL,
+        completed_by INT NULL,
+        completed_at DATETIME NULL,
         bukti_kerja VARCHAR(255) NULL,
         catatan_revisi TEXT NULL,
         catatan_reviewer TEXT NULL,
@@ -174,6 +178,10 @@ async function initDB() {
       ['tasks', 'libur_pengecualian', 'ALTER TABLE tasks ADD COLUMN libur_pengecualian TEXT NULL AFTER nilai_kualitas']
       ,['tasks', 'kendala', 'ALTER TABLE tasks ADD COLUMN kendala TEXT NULL AFTER file_attachment']
       ,['tasks', 'solusi', 'ALTER TABLE tasks ADD COLUMN solusi TEXT NULL AFTER kendala']
+      ,['tasks', 'started_by', 'ALTER TABLE tasks ADD COLUMN started_by INT NULL AFTER solusi']
+      ,['tasks', 'started_at', 'ALTER TABLE tasks ADD COLUMN started_at DATETIME NULL AFTER started_by']
+      ,['tasks', 'completed_by', 'ALTER TABLE tasks ADD COLUMN completed_by INT NULL AFTER started_at']
+      ,['tasks', 'completed_at', 'ALTER TABLE tasks ADD COLUMN completed_at DATETIME NULL AFTER completed_by']
       ,['users', 'can_patroli', 'ALTER TABLE users ADD COLUMN can_patroli TINYINT(1) NOT NULL DEFAULT 0 AFTER no_telepon']
     ];
     for (const [table, column, statement] of migrations) {

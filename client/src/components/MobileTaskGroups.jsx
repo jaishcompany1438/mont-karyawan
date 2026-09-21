@@ -24,12 +24,13 @@ function statusLabel(status) {
   }[status] || status;
 }
 
-export default function MobileTaskGroups({ tasks = [], onOpenSubmitWork, onOpenReview, onStartTask }) {
+export default function MobileTaskGroups({ tasks = [], onOpenSubmitWork, onOpenReview, onStartTask, onOpenDelegate }) {
   const { user } = useAuth();
   const role = user?.role;
+  const [expandedTitle, setExpandedTitle] = React.useState(null);
   const canReview = (task) => ['SUPER_ADMIN', 'MUDIR', 'WAKIL_MUDIR', 'WADIR_PEND', 'WADIR_PENGS'].includes(role)
-    || task.created_by === user?.id
-    || (role === 'KABID' && task.bidang_id === user?.bidang_id);
+    || (role === 'KABID' && task.bidang_id === user?.bidang_id
+      && task.assignee_role === 'STAF' && ['KABID', 'STAF'].includes(task.creator_role));
 
   return (
     <div className="space-y-3 md:hidden">
@@ -48,7 +49,21 @@ export default function MobileTaskGroups({ tasks = [], onOpenSubmitWork, onOpenR
                 return (
                   <article key={task.id} className="p-4">
                     <div className="flex items-start justify-between gap-3">
-                      <h4 className="line-clamp-2 text-sm font-bold leading-snug text-slate-900">{task.judul}</h4>
+                      <div className="relative min-w-0 flex-1">
+                        <button
+                          type="button"
+                          onClick={() => setExpandedTitle(expandedTitle === task.id ? null : task.id)}
+                          className="block w-full text-left"
+                          aria-label={`Baca judul lengkap: ${task.judul}`}
+                        >
+                          <h4 className="line-clamp-2 text-sm font-bold leading-snug text-slate-900">{task.judul}</h4>
+                        </button>
+                        {expandedTitle === task.id && (
+                          <div className="absolute bottom-full left-0 z-20 mb-2 w-full rounded-lg border border-slate-200 bg-slate-900 px-3 py-2 text-xs font-medium leading-relaxed text-white shadow-lg">
+                            {task.judul}
+                          </div>
+                        )}
+                      </div>
                       <span className="shrink-0 rounded-full bg-slate-100 px-2 py-1 text-[10px] font-bold text-slate-600">{task.prioritas}</span>
                     </div>
                     <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-slate-500">
@@ -58,6 +73,7 @@ export default function MobileTaskGroups({ tasks = [], onOpenSubmitWork, onOpenR
                     <div className="mt-2 flex items-center justify-between gap-2">
                       <span className={`text-[10px] font-bold ${group.id === 'overdue' ? 'text-rose-600' : group.id === 'completed' ? 'text-emerald-600' : 'text-blue-600'}`}>{statusLabel(task.status)}</span>
                       <div className="flex gap-1.5">
+                        {role === 'KABID' && task.bidang_id === user?.bidang_id && (task.created_by === user?.id || task.assigned_to === user?.id) && <button onClick={() => onOpenDelegate(task)} className="rounded-lg border border-emerald-200 bg-emerald-50 px-2 py-1.5 text-[10px] font-bold text-emerald-700">Delegasikan</button>}
                         {task.status === 'TO_DO' && (isAssignee || role === 'SUPER_ADMIN') && <button onClick={() => onStartTask(task.id)} className="flex items-center gap-1 rounded-lg border border-blue-200 bg-blue-50 px-2 py-1.5 text-[10px] font-bold text-blue-700"><Play className="h-3 w-3" /> Mulai</button>}
                         {['IN_PROGRESS', 'REVISION'].includes(task.status) && (isAssignee || role === 'SUPER_ADMIN') && <button onClick={() => onOpenSubmitWork(task)} className="rounded-lg bg-emerald-600 px-2 py-1.5 text-[10px] font-bold text-white">Kirim Bukti</button>}
                         {task.status === 'UNDER_REVIEW' && canReview(task) && <button onClick={() => onOpenReview(task)} className="flex items-center gap-1 rounded-lg bg-amber-500 px-2 py-1.5 text-[10px] font-bold text-white"><FileSearch className="h-3 w-3" /> Review</button>}

@@ -131,6 +131,8 @@ async function getReportRows(req) {
              creator.nama AS creator_nama,
              assignee.nama AS assignee_nama, assignee.email AS assignee_email, assignee.no_telepon AS assignee_no_telepon,
              assignee.jabatan AS assignee_jabatan, assignee.sub_bidang AS assignee_sub_bidang,
+             starter.nama AS started_by_nama,
+             completer.nama AS completed_by_nama,
              b.nama_bidang, b.kode_bidang,
              t.deskripsi AS catatan_tugas,
              t.catatan_reviewer,
@@ -138,6 +140,8 @@ async function getReportRows(req) {
       FROM tasks t
       JOIN users creator ON t.created_by = creator.id
       JOIN users assignee ON t.assigned_to = assignee.id
+      LEFT JOIN users starter ON t.started_by = starter.id
+      LEFT JOIN users completer ON t.completed_by = completer.id
       JOIN bidang b ON t.bidang_id = b.id
       WHERE 1=1
     `;
@@ -203,6 +207,7 @@ async function exportExcelReport(req, res) {
       { header: 'Prioritas', key: 'prioritas', width: 14 },
       { header: 'Status', key: 'status', width: 16 },
       { header: 'Penerima Tugas (Assignee)', key: 'assignee', width: 25 },
+      { header: 'Pelaksana', key: 'pelaksana', width: 30 },
       { header: 'Jabatan / Sub-Bidang', key: 'assignee_position', width: 32 },
       { header: 'Pemberi Tugas', key: 'creator', width: 22 },
       { header: 'Bidang / Divisi', key: 'bidang', width: 25 },
@@ -234,6 +239,7 @@ async function exportExcelReport(req, res) {
         status: row.status,
         assignee: `${row.assignee_nama} (${row.assignee_email})`,
         assignee_position: [row.assignee_jabatan, row.assignee_sub_bidang].filter(Boolean).join(' / ') || '-',
+        pelaksana: formatPelaksana(row),
         creator: row.creator_nama,
         bidang: row.nama_bidang,
         anggaran_dana: Number(row.anggaran_dana || 0),
@@ -266,6 +272,13 @@ function formatKendalaSolusi(kendala, solusi) {
   if (issue) sections.push(`Kendala:\n${issue}`);
   if (resolution) sections.push(`Solusi:\n${resolution}`);
   return sections.join('\n\n') || '-';
+}
+
+function formatPelaksana(row) {
+  const assignee = row.assignee_nama || '-';
+  const started = row.started_by_nama ? `Mulai: ${row.started_by_nama}` : '';
+  const completed = row.completed_by_nama ? `Selesai: ${row.completed_by_nama}` : '';
+  return [assignee, started, completed].filter(Boolean).join('\n');
 }
 
 function getReportLogo() {
@@ -332,6 +345,7 @@ function aggregateReportRows(rows, filters = {}) {
         kendalaNotes: [],
         solusiNotes: [],
         ratings: []
+        , executors: []
       };
     }
     const group = result[key];
@@ -347,6 +361,7 @@ function aggregateReportRows(rows, filters = {}) {
     const solusi = String(row.solusi || '').trim();
     if (kendala) group.kendalaNotes.push(kendala);
     if (solusi) group.solusiNotes.push(solusi);
+    [row.assignee_nama, row.started_by_nama, row.completed_by_nama].filter(Boolean).forEach((name) => group.executors.push(name));
     [row.nilai_sop, row.nilai_waktu, row.nilai_kualitas].forEach((value) => {
       if (value !== null && value !== undefined && value !== '') group.ratings.push(Number(value));
     });
@@ -367,6 +382,7 @@ function aggregateReportRows(rows, filters = {}) {
         [...new Set(group.kendalaNotes)].slice(-3).join('\n- '),
         [...new Set(group.solusiNotes)].slice(-3).join('\n- ')
       ),
+      pelaksana: [...new Set(group.executors)].slice(-3).join('\n') || '-',
       penilaian: group.ratings.length
         ? (group.ratings.reduce((sum, value) => sum + value, 0) / group.ratings.length).toFixed(1)
         : '-'
@@ -407,7 +423,7 @@ function createReportPdf(rows, filters, ownerName = '') {
     .split(',')
     .map((column) => column.trim())
     .filter(Boolean);
-  const allowedColumns = ['judul', 'periode', 'progress', 'total_anggaran', 'sisa_saldo', 'catatan_tugas', 'kendala_solusi', 'catatan_reviewer', 'penilaian'];
+  const allowedColumns = ['judul', 'periode', 'progress', 'total_anggaran', 'sisa_saldo', 'catatan_tugas', 'kendala_solusi', 'catatan_reviewer', 'penilaian', 'pelaksana'];
   const selectedColumns = [...new Set(['judul', 'periode', ...selected.filter((column) => allowedColumns.includes(column))])];
   const columnDefinitions = {
     judul: { label: 'Judul Tugas', width: 190, value: (row, index) => `${index + 1}. ${row.judul || '-'}` },
@@ -419,6 +435,7 @@ function createReportPdf(rows, filters, ownerName = '') {
     kendala_solusi: { label: 'Kendala dan Solusi', width: 145, value: (row) => row.kendala_solusi || '-' },
     catatan_reviewer: { label: 'Catatan Reviewer', width: 130, value: (row) => row.catatan_reviewer || '-' },
     penilaian: { label: 'Penilaian', width: 65, value: (row) => row.penilaian || '-', align: 'right' }
+    , pelaksana: { label: 'Pelaksana', width: 125, value: (row) => row.pelaksana || '-' }
   };
   const estimatedWidth = selectedColumns.reduce((sum, key) => sum + columnDefinitions[key].width, 0);
   const landscape = estimatedWidth > 515;
