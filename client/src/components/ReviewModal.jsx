@@ -64,8 +64,8 @@ export default function ReviewModal({ isOpen, onClose, onSuccess, task }) {
     <>
     <SuccessToast message={success} onClose={() => setSuccess('')} />
     <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
-      <div className="bg-white rounded-3xl max-w-xl w-full shadow-2xl border border-slate-200 overflow-hidden animate-in fade-in zoom-in-95 duration-150">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-slate-50/50">
+      <div className="bg-white rounded-3xl max-w-xl w-full max-h-[90vh] flex flex-col shadow-2xl border border-slate-200 overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+        <div className="flex shrink-0 items-center justify-between px-6 py-4 border-b border-slate-100 bg-slate-50/50">
           <div>
             <h3 className="text-base font-bold text-slate-900">
               Verifikasi & Review Pekerjaan
@@ -82,7 +82,7 @@ export default function ReviewModal({ isOpen, onClose, onSuccess, task }) {
           </button>
         </div>
 
-        <div className="p-6 space-y-4 text-xs">
+        <div className="min-h-0 flex-1 overflow-y-auto p-6 space-y-4 text-xs">
           {error && (
             <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-rose-700 font-medium">
               {error}
@@ -182,8 +182,10 @@ export default function ReviewModal({ isOpen, onClose, onSuccess, task }) {
             />
           </div>
 
+          </div>
+
           {/* Action Decision Buttons */}
-          <div className="flex items-center justify-between pt-4 border-t border-slate-100 gap-3">
+          <div className="flex shrink-0 items-center justify-between border-t border-slate-100 bg-white px-6 py-4 gap-3">
             <button
               type="button"
               disabled={loading}
@@ -203,7 +205,6 @@ export default function ReviewModal({ isOpen, onClose, onSuccess, task }) {
               <CheckCircle className="w-4 h-4" />
               <span>Setujui Selesai (Approve)</span>
             </button>
-          </div>
         </div>
       </div>
     </div>
