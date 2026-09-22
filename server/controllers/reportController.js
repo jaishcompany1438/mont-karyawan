@@ -123,7 +123,7 @@ async function getDashboardStats(req, res) {
 
 async function getReportRows(req) {
     const { role, bidang_id, id: userId } = req.user;
-    const { periode, status, bidang_id: filterBidangId, start_date: startDate, end_date: endDate } = req.query;
+    const { periode, status, bidang_id: filterBidangId, start_date: startDate, end_date: endDate, own_tasks: ownTasks } = req.query;
     const db = getPool();
 
     let query = `
@@ -153,10 +153,11 @@ async function getReportRows(req) {
     } else if (role === 'KABID') {
       query += ' AND (t.bidang_id = ? OR t.created_by = ? OR t.assigned_to = ?)';
       params.push(bidang_id, userId, userId);
-    } else if (role === 'WADIR_PEND' || role === 'WADIR_PENGS') {
+    } else if (['WADIR_PEND', 'WADIR_PENGS'].includes(role) && ownTasks !== '1') {
       query += ' AND (b.parent_role = ? OR t.created_by = ? OR t.assigned_to = ?)';
       params.push(role, userId, userId);
-    } else if (role === 'WAKIL_MUDIR') {
+    } else if (['WADIR_PEND', 'WADIR_PENGS', 'WAKIL_MUDIR'].includes(role)) {
+      // Wakil Mudir may export only tasks created by or assigned to their own account.
       query += ' AND (t.created_by = ? OR t.assigned_to = ?)';
       params.push(userId, userId);
     }
@@ -470,21 +471,28 @@ function createReportPdf(rows, filters, ownerName = '') {
       return column;
     });
 
-    const drawHeader = () => {
+    const drawHeader = (compact = false) => {
       doc.addPage();
-      let y = 42;
+      let y = compact ? 24 : 42;
+      const logoSize = compact ? 22 : 54;
       if (logo) {
-        SVGtoPDF(doc, logo, margin, y, { width: 54, height: 54 });
+        SVGtoPDF(doc, logo, margin, y, { width: logoSize, height: logoSize });
       } else {
-        doc.roundedRect(margin, y, 54, 54, 10).fill(green);
+        doc.roundedRect(margin, y, logoSize, logoSize, compact ? 5 : 10).fill(green);
       }
-      const textX = margin + 68;
-      doc.fillColor('#0F172A').font('Helvetica-Bold').fontSize(17)
-        .text('LAPORAN REKAP KINERJA TUGAS', textX, y + 2, { width: contentWidth - 68 });
-      doc.fontSize(11).text('PTQ Imam Ath Thobari', textX, y + 27);
-      doc.fillColor(muted).font('Helvetica').fontSize(9)
-        .text(`Periode: ${filters.start_date || '-'} s/d ${filters.end_date || '-'}`, textX, y + 43);
-      y += 78;
+      const textX = margin + logoSize + (compact ? 10 : 14);
+      doc.fillColor('#0F172A').font('Helvetica-Bold').fontSize(compact ? 9 : 17)
+        .text('LAPORAN REKAP KINERJA TUGAS', textX, y + 2, { width: contentWidth - (textX - margin) });
+      if (compact) {
+        doc.fillColor(muted).font('Helvetica').fontSize(7)
+          .text(`PTQ Imam Ath Thobari | Periode: ${filters.start_date || '-'} s/d ${filters.end_date || '-'}`, textX, y + 14);
+        y += 34;
+      } else {
+        doc.fontSize(11).text('PTQ Imam Ath Thobari', textX, y + 27);
+        doc.fillColor(muted).font('Helvetica').fontSize(9)
+          .text(`Periode: ${filters.start_date || '-'} s/d ${filters.end_date || '-'}`, textX, y + 43);
+        y += 78;
+      }
       doc.fillColor(muted).font('Helvetica-Bold').fontSize(9).text('Pemilik Laporan :', margin, y);
       doc.fillColor('#0F172A').font('Helvetica').fontSize(11).text(bidangName, margin, y + 14);
       return y + 42;
@@ -559,7 +567,7 @@ function createReportPdf(rows, filters, ownerName = '') {
     aggregatedRows.forEach((row, index) => {
       const rowHeight = getRowHeight(row);
       if (y + rowHeight > pageHeight - 76) {
-        y = drawHeader();
+        y = drawHeader(true);
         y = drawTableHeader(y);
       }
       if (index % 2 === 0) {
@@ -595,7 +603,7 @@ function createReportPdf(rows, filters, ownerName = '') {
       y += 38;
     }
     if (y + 53 > signatureTop - 12) {
-      y = drawHeader();
+      y = drawHeader(true);
     }
     doc.save().roundedRect(margin, y + 18, contentWidth, 35, 8).fill(lightGreen).restore();
     doc.fillColor(green).font('Helvetica-Bold').fontSize(10)

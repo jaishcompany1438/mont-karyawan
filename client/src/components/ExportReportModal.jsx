@@ -25,14 +25,18 @@ export default function ExportReportModal({ isOpen, onClose, filters = {} }) {
   const [bidangId, setBidangId] = React.useState(filters.bidang_id || '');
   const [selectedColumns, setSelectedColumns] = React.useState(['judul', 'periode']);
   const isKabid = user?.role === 'KABID';
+  const isWakilMudir = user?.role === 'WAKIL_MUDIR';
+  const isWadir = ['WADIR_PEND', 'WADIR_PENGS'].includes(user?.role);
+  const isOwnTaskExport = isWakilMudir || isWadir;
 
   React.useEffect(() => {
     if (!isOpen) return;
     api.getBidang().then((result) => {
       setBidang(result.data || []);
       if (isKabid) setBidangId(String(user.bidang_id || ''));
-    }).catch((err) => setError(err.message));
-  }, [isOpen, isKabid, user?.bidang_id]);
+        if (isWakilMudir) setBidangId('');
+      }).catch((err) => setError(err.message));
+    }, [isOpen, isKabid, isWakilMudir, user?.bidang_id]);
 
   const toggleColumn = (key) => {
     setSelectedColumns((current) => current.includes(key)
@@ -51,6 +55,7 @@ export default function ExportReportModal({ isOpen, onClose, filters = {} }) {
       const exportFilters = {
         ...filters,
         bidang_id: isKabid ? user.bidang_id : bidangId,
+        own_tasks: isOwnTaskExport ? '1' : undefined,
         start_date: startDate,
         end_date: endDate,
         selected_columns: selectedColumns.join(',')
@@ -92,9 +97,10 @@ export default function ExportReportModal({ isOpen, onClose, filters = {} }) {
             </select>
           </label>
           <label className="text-xs font-semibold text-slate-700">
-            Pilih Bidang
-            <select value={isKabid ? String(user.bidang_id || '') : bidangId} onChange={(e) => setBidangId(e.target.value)} disabled={isKabid} className="mt-1 w-full rounded-lg border bg-white px-2 py-2 text-xs disabled:bg-slate-100">
-              {!isKabid && <option value="">Semua bidang</option>}
+            {isOwnTaskExport ? 'Ruang Lingkup' : 'Pilih Bidang'}
+            <select value={isKabid ? String(user.bidang_id || '') : bidangId} onChange={(e) => setBidangId(e.target.value)} disabled={isKabid || isOwnTaskExport} className="mt-1 w-full rounded-lg border bg-white px-2 py-2 text-xs disabled:bg-slate-100">
+              {isOwnTaskExport && <option value="">Hasil kerja saya sendiri</option>}
+              {!isKabid && !isOwnTaskExport && <option value="">Semua bidang</option>}
               {bidang.map((item) => <option key={item.id} value={item.id}>{item.nama_bidang}</option>)}
             </select>
           </label>
