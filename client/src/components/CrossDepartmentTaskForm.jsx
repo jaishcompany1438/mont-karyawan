@@ -79,7 +79,7 @@ export default function CrossDepartmentTaskForm({ departments = [], onSubmitSucc
     <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
       <div className="mb-5 border-b border-slate-100 pb-3">
         <h3 className="flex items-center gap-2 text-base font-bold text-slate-800">
-          <Building2 className="h-5 w-5 text-emerald-600" />
+          <Building2 className="h-5 w-5 text-blue-600" />
           Form Pengajuan Tugas Lintas Bidang
         </h3>
         <p className="mt-1 text-xs text-slate-500">
@@ -95,7 +95,7 @@ export default function CrossDepartmentTaskForm({ departments = [], onSubmitSucc
       )}
 
       {successMsg && (
-        <div className="mb-4 flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-xs text-emerald-700">
+        <div className="mb-4 flex items-center gap-2 rounded-xl border border-blue-200 bg-blue-50 p-3 text-xs text-blue-700">
           <CheckCircle2 className="h-4 w-4 shrink-0" />
           <span>{successMsg}</span>
         </div>
@@ -111,7 +111,7 @@ export default function CrossDepartmentTaskForm({ departments = [], onSubmitSucc
             value={targetBidangId}
             onChange={(e) => setTargetBidangId(e.target.value)}
             required
-            className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+            className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
           >
             <option value="">-- Pilih Bidang Tujuan --</option>
             {deptList.map((dept) => (
@@ -133,7 +133,7 @@ export default function CrossDepartmentTaskForm({ departments = [], onSubmitSucc
             value={judul}
             onChange={(e) => setJudul(e.target.value)}
             required
-            className="w-full rounded-xl border border-slate-300 px-3 py-2.5 text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+            className="w-full rounded-xl border border-slate-300 px-3 py-2.5 text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
         </div>
 
@@ -148,7 +148,7 @@ export default function CrossDepartmentTaskForm({ departments = [], onSubmitSucc
             value={deskripsi}
             onChange={(e) => setDeskripsi(e.target.value)}
             required
-            className="w-full rounded-xl border border-slate-300 px-3 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+            className="w-full rounded-xl border border-slate-300 px-3 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
         </div>
 
@@ -161,7 +161,7 @@ export default function CrossDepartmentTaskForm({ departments = [], onSubmitSucc
             <select
               value={urgensi}
               onChange={(e) => setUrgensi(e.target.value)}
-              className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+              className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               <option value="RENDAH">Rendah (Bisa dijadwalkan)</option>
               <option value="SEDANG">Sedang (Standar operasional)</option>
@@ -179,7 +179,7 @@ export default function CrossDepartmentTaskForm({ departments = [], onSubmitSucc
               value={dueDate}
               onChange={(e) => setDueDate(e.target.value)}
               required
-              className="w-full rounded-xl border border-slate-300 px-3 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+              className="w-full rounded-xl border border-slate-300 px-3 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
         </div>
@@ -192,10 +192,10 @@ export default function CrossDepartmentTaskForm({ departments = [], onSubmitSucc
           <input
             type="file"
             onChange={(e) => setFile(e.target.files[0] || null)}
-            className="w-full text-xs text-slate-500 file:mr-3 file:rounded-xl file:border-0 file:bg-emerald-50 file:px-4 file:py-2 file:text-xs file:font-semibold file:text-emerald-700 hover:file:bg-emerald-100"
+            className="w-full text-xs text-slate-500 file:mr-3 file:rounded-xl file:border-0 file:bg-blue-50 file:px-4 file:py-2 file:text-xs file:font-semibold file:text-blue-700 hover:file:bg-blue-100"
           />
           {file && (
-            <p className="mt-1 text-[11px] font-medium text-emerald-700">
+            <p className="mt-1 text-[11px] font-medium text-blue-700">
               Berkas terpilih: {file.name}
             </p>
           )}
@@ -215,7 +215,7 @@ export default function CrossDepartmentTaskForm({ departments = [], onSubmitSucc
           <button
             type="submit"
             disabled={loading}
-            className="flex items-center gap-2 rounded-xl bg-emerald-700 px-5 py-2 font-bold text-white shadow-md shadow-emerald-700/20 hover:bg-emerald-600 disabled:opacity-50"
+            className="flex items-center gap-2 rounded-xl bg-blue-700 px-5 py-2 font-bold text-white shadow-md shadow-blue-700/20 hover:bg-blue-600 disabled:opacity-50"
           >
             <Send className="h-3.5 w-3.5" />
             <span>{loading ? 'Mengirim...' : 'Kirim Pengajuan'}</span>

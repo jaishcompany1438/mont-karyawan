@@ -79,9 +79,9 @@ export default function NotificationDropdown() {
       case 'REVIEW_PEKERJAAN':
         return {
           icon: FileCheck,
-          iconColor: 'text-emerald-600',
-          badgeBg: 'bg-emerald-100 text-emerald-800 border-emerald-200',
-          cardBg: 'bg-emerald-50/50 hover:bg-emerald-50/80',
+          iconColor: 'text-blue-600',
+          badgeBg: 'bg-blue-100 text-blue-800 border-blue-200',
+          cardBg: 'bg-blue-50/50 hover:bg-blue-50/80',
           label: 'Review'
         };
       default:
@@ -152,7 +152,7 @@ export default function NotificationDropdown() {
             {unreadCount > 0 && (
               <button
                 onClick={handleMarkAllAsRead}
-                className="flex items-center gap-1 text-[11px] font-semibold text-emerald-700 hover:text-emerald-800"
+                className="flex items-center gap-1 text-[11px] font-semibold text-blue-700 hover:text-blue-800"
               >
                 <Check className="h-3 w-3" />
                 Tandai semua dibaca

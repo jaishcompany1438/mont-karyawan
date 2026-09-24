@@ -80,7 +80,7 @@ export default function ExcelUploadModal({ isOpen, onClose, onSuccess }) {
       <div className="bg-white rounded-3xl max-w-xl w-full shadow-2xl border border-slate-200 overflow-hidden animate-in fade-in zoom-in-95 duration-150">
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-slate-50/50">
           <div className="flex items-center space-x-2.5">
-            <div className="p-2 bg-emerald-100 text-emerald-800 rounded-xl">
+            <div className="p-2 bg-blue-100 text-blue-800 rounded-xl">
               <FileSpreadsheet className="w-5 h-5" />
             </div>
             <div>
@@ -108,7 +108,7 @@ export default function ExcelUploadModal({ isOpen, onClose, onSuccess }) {
               onClick={() => handleTabChange(tab.id)}
               className={`pb-2.5 px-4 text-xs font-bold transition-all border-b-2 ${
                 activeTab === tab.id
-                  ? 'border-emerald-600 text-emerald-700'
+                  ? 'border-blue-600 text-blue-700'
                   : 'border-transparent text-slate-500 hover:text-slate-800'
               }`}
             >
@@ -119,9 +119,9 @@ export default function ExcelUploadModal({ isOpen, onClose, onSuccess }) {
 
         <div className="p-6 space-y-4 text-xs">
           {/* Step 1: Download Template */}
-          <div className="p-4 bg-emerald-50/50 border border-emerald-200 rounded-2xl flex items-center justify-between">
+          <div className="p-4 bg-blue-50/50 border border-blue-200 rounded-2xl flex items-center justify-between">
             <div>
-              <span className="text-[10px] font-bold text-emerald-800 uppercase tracking-wider block">
+              <span className="text-[10px] font-bold text-blue-800 uppercase tracking-wider block">
                 Langkah 1: Gunakan Format Resmi
               </span>
               <p className="text-slate-600 mt-0.5">
@@ -131,7 +131,7 @@ export default function ExcelUploadModal({ isOpen, onClose, onSuccess }) {
             <button
               type="button"
               onClick={handleDownloadTemplate}
-              className="px-3.5 py-2 bg-emerald-700 hover:bg-emerald-600 text-white rounded-xl font-bold flex items-center space-x-1.5 shadow-sm transition-colors shrink-0"
+              className="px-3.5 py-2 bg-blue-700 hover:bg-blue-600 text-white rounded-xl font-bold flex items-center space-x-1.5 shadow-sm transition-colors shrink-0"
             >
               <Download className="w-3.5 h-3.5" />
               <span>Unduh Template</span>
@@ -148,7 +148,7 @@ export default function ExcelUploadModal({ isOpen, onClose, onSuccess }) {
           {/* Success / Result Feedback */}
           {result && (
             <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl space-y-2">
-              <div className="flex items-center space-x-2 text-emerald-700 font-bold text-xs">
+              <div className="flex items-center space-x-2 text-blue-700 font-bold text-xs">
                 <CheckCircle2 className="w-4 h-4" />
                 <span>{result.message}</span>
               </div>
@@ -174,8 +174,8 @@ export default function ExcelUploadModal({ isOpen, onClose, onSuccess }) {
               <label className="block font-bold text-slate-700 mb-1">
                 Langkah 2: Pilih File Excel Yang Telah Diisi (.xlsx)
               </label>
-              <div className="border-2 border-dashed border-slate-300 rounded-2xl p-6 text-center hover:border-emerald-500 transition-colors bg-slate-50/50">
-                <FileSpreadsheet className="w-8 h-8 mx-auto text-emerald-600 mb-2" />
+              <div className="border-2 border-dashed border-slate-300 rounded-2xl p-6 text-center hover:border-blue-500 transition-colors bg-slate-50/50">
+                <FileSpreadsheet className="w-8 h-8 mx-auto text-blue-600 mb-2" />
                 <input
                   type="file"
                   accept=".xlsx, .xls"
@@ -184,10 +184,10 @@ export default function ExcelUploadModal({ isOpen, onClose, onSuccess }) {
                     setError('');
                     setResult(null);
                   }}
-                  className="w-full text-xs text-slate-500 file:mr-3 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-emerald-50 file:text-emerald-700 hover:file:bg-emerald-100"
+                  className="w-full text-xs text-slate-500 file:mr-3 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
                 />
                 {file && (
-                  <p className="text-emerald-700 font-bold text-xs mt-2">
+                  <p className="text-blue-700 font-bold text-xs mt-2">
                     Berkas terpilih: {file.name} ({(file.size / 1024).toFixed(1)} KB)
                   </p>
                 )}
@@ -205,7 +205,7 @@ export default function ExcelUploadModal({ isOpen, onClose, onSuccess }) {
               <button
                 type="submit"
                 disabled={loading || !file}
-                className="px-5 py-2 rounded-xl bg-emerald-700 hover:bg-emerald-600 text-white font-bold shadow-md shadow-emerald-700/20 disabled:opacity-50 flex items-center space-x-1.5"
+                className="px-5 py-2 rounded-xl bg-blue-700 hover:bg-blue-600 text-white font-bold shadow-md shadow-blue-700/20 disabled:opacity-50 flex items-center space-x-1.5"
               >
                 <Upload className="w-4 h-4" />
                 <span>{loading ? 'Memproses...' : 'Mulai Import Data'}</span>

@@ -58,7 +58,7 @@ function AuthenticatedApp() {
   }[activeTab] || <Dashboard {...pageProps} onNavigate={(tab, filters = {}) => { setTaskFilters(filters); setActiveTab(tab); }} />;
 
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="min-h-screen bg-[linear-gradient(135deg,#f8fbff_0%,#eff6ff_58%,#ecfdf5_100%)]">
       <Navbar onMenuToggle={() => setMobileMenuOpen((open) => !open)} />
       <div className="md:flex">
         <Sidebar

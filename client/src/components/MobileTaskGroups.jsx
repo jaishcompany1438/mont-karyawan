@@ -3,7 +3,7 @@ import { AlertTriangle, Calendar, CheckCircle2, Clock, FileSearch, Play } from '
 import { useAuth } from '../context/AuthContext';
 
 const groups = [
-  { id: 'completed', title: 'Telah Selesai', icon: CheckCircle2, color: 'text-emerald-700 bg-emerald-50 border-emerald-200' },
+  { id: 'completed', title: 'Telah Selesai', icon: CheckCircle2, color: 'text-blue-700 bg-blue-50 border-blue-200' },
   { id: 'active', title: 'Belum Selesai / Dikerjakan', icon: Clock, color: 'text-blue-700 bg-blue-50 border-blue-200' },
   { id: 'overdue', title: 'Lewat Waktu', icon: AlertTriangle, color: 'text-rose-700 bg-rose-50 border-rose-200' }
 ];
@@ -71,11 +71,11 @@ export default function MobileTaskGroups({ tasks = [], onOpenSubmitWork, onOpenR
                       <span>{task.assignee_nama}{task.assignee_sub_bidang ? ` · ${task.assignee_sub_bidang}` : ''}</span>
                     </div>
                     <div className="mt-2 flex items-center justify-between gap-2">
-                      <span className={`text-[10px] font-bold ${group.id === 'overdue' ? 'text-rose-600' : group.id === 'completed' ? 'text-emerald-600' : 'text-blue-600'}`}>{statusLabel(task.status)}</span>
+                      <span className={`text-[10px] font-bold ${group.id === 'overdue' ? 'text-rose-600' : group.id === 'completed' ? 'text-blue-600' : 'text-blue-600'}`}>{statusLabel(task.status)}</span>
                       <div className="flex gap-1.5">
-                        {role === 'KABID' && task.bidang_id === user?.bidang_id && (task.created_by === user?.id || task.assigned_to === user?.id) && <button onClick={() => onOpenDelegate(task)} className="rounded-lg border border-emerald-200 bg-emerald-50 px-2 py-1.5 text-[10px] font-bold text-emerald-700">Delegasikan</button>}
+                        {role === 'KABID' && task.bidang_id === user?.bidang_id && (task.created_by === user?.id || task.assigned_to === user?.id) && <button onClick={() => onOpenDelegate(task)} className="rounded-lg border border-blue-200 bg-blue-50 px-2 py-1.5 text-[10px] font-bold text-blue-700">Delegasikan</button>}
                         {task.status === 'TO_DO' && (isAssignee || role === 'SUPER_ADMIN') && <button onClick={() => onStartTask(task.id)} className="flex items-center gap-1 rounded-lg border border-blue-200 bg-blue-50 px-2 py-1.5 text-[10px] font-bold text-blue-700"><Play className="h-3 w-3" /> Mulai</button>}
-                        {['IN_PROGRESS', 'REVISION'].includes(task.status) && (isAssignee || role === 'SUPER_ADMIN') && <button onClick={() => onOpenSubmitWork(task)} className="rounded-lg bg-emerald-600 px-2 py-1.5 text-[10px] font-bold text-white">Kirim Bukti</button>}
+                        {['IN_PROGRESS', 'REVISION'].includes(task.status) && (isAssignee || role === 'SUPER_ADMIN') && <button onClick={() => onOpenSubmitWork(task)} className="rounded-lg bg-blue-600 px-2 py-1.5 text-[10px] font-bold text-white">Kirim Bukti</button>}
                         {task.status === 'UNDER_REVIEW' && canReview(task) && <button onClick={() => onOpenReview(task)} className="flex items-center gap-1 rounded-lg bg-amber-500 px-2 py-1.5 text-[10px] font-bold text-white"><FileSearch className="h-3 w-3" /> Review</button>}
                       </div>
                     </div>

@@ -19,7 +19,7 @@ function getColor(score) {
 const colorStyles = {
   MERAH: { text: 'text-rose-700', track: 'accent-rose-600', badge: 'bg-rose-100 text-rose-700 border-rose-200' },
   ORANYE: { text: 'text-orange-700', track: 'accent-orange-500', badge: 'bg-orange-100 text-orange-700 border-orange-200' },
-  HIJAU: { text: 'text-emerald-700', track: 'accent-emerald-600', badge: 'bg-emerald-100 text-emerald-700 border-emerald-200' }
+  HIJAU: { text: 'text-blue-700', track: 'accent-blue-600', badge: 'bg-blue-100 text-blue-700 border-blue-200' }
 };
 
 export default function PatrolForm({ onSuccess, canManageRooms = false }) {
@@ -90,21 +90,21 @@ export default function PatrolForm({ onSuccess, canManageRooms = false }) {
   return (
     <>
     <SuccessToast message={success} onClose={() => setSuccess('')} />
-    <form onSubmit={submit} className="rounded-3xl border border-emerald-100 bg-white p-5 shadow-sm sm:p-6">
+    <form onSubmit={submit} className="rounded-3xl border border-blue-100 bg-white p-5 shadow-sm sm:p-6">
       <div className="mb-5 flex items-start justify-between gap-3">
-        <div><p className="text-xs font-bold uppercase tracking-wider text-emerald-700">Input inspeksi</p><h3 className="mt-1 text-lg font-extrabold text-slate-900">Catat Patroli Fasilitas</h3></div>
-        <Camera className="h-6 w-6 text-emerald-600" />
+        <div><p className="text-xs font-bold uppercase tracking-wider text-blue-700">Input inspeksi</p><h3 className="mt-1 text-lg font-extrabold text-slate-900">Catat Patroli Fasilitas</h3></div>
+        <Camera className="h-6 w-6 text-blue-600" />
       </div>
       {error && <div className="mb-4 rounded-xl bg-rose-50 p-3 text-xs text-rose-700">{error}</div>}
-      {success && <div className="mb-4 flex items-center gap-2 rounded-xl bg-emerald-50 p-3 text-xs text-emerald-700"><CheckCircle2 className="h-4 w-4" />{success}</div>}
+      {success && <div className="mb-4 flex items-center gap-2 rounded-xl bg-blue-50 p-3 text-xs text-blue-700"><CheckCircle2 className="h-4 w-4" />{success}</div>}
       <div className="grid gap-4 sm:grid-cols-2">
         <label className="text-xs font-bold text-slate-700">Area / Ruangan *
-          <select required value={room} onChange={(e) => setRoom(e.target.value)} className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 font-normal outline-none focus:ring-2 focus:ring-emerald-500">
+          <select required value={room} onChange={(e) => setRoom(e.target.value)} className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 font-normal outline-none focus:ring-2 focus:ring-blue-500">
             <option value="">Pilih area</option>{rooms.map((item) => <option value={item.id} key={item.id}>{item.nama_ruangan}</option>)}
           </select>
         </label>
         <label className="text-xs font-bold text-slate-700">Tanggal *
-          <input required type="date" value={date} onChange={(e) => setDate(e.target.value)} className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2.5 font-normal outline-none focus:ring-2 focus:ring-emerald-500" />
+          <input required type="date" value={date} onChange={(e) => setDate(e.target.value)} className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2.5 font-normal outline-none focus:ring-2 focus:ring-blue-500" />
         </label>
       </div>
       {canManageRooms && <div className="mt-3 flex gap-2"><input value={newRoom} onChange={(e) => setNewRoom(e.target.value)} placeholder="Tambah area baru..." className="min-w-0 flex-1 rounded-xl border px-3 py-2 text-xs" /><button type="button" onClick={addRoom} className="rounded-xl bg-slate-800 px-3 py-2 text-xs font-bold text-white">Tambah Area</button></div>}
@@ -120,12 +120,12 @@ export default function PatrolForm({ onSuccess, canManageRooms = false }) {
         })}
       </div>
       <label className="mt-5 block text-xs font-bold text-slate-700">Catatan Temuan {hasCritical && <span className="text-rose-600">*</span>}
-        <textarea rows="3" required={hasCritical} value={note} onChange={(e) => setNote(e.target.value)} placeholder={hasCritical ? 'Wajib jelaskan temuan kritis...' : 'Tambahkan catatan bila diperlukan...'} className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2.5 font-normal outline-none focus:ring-2 focus:ring-emerald-500" />
+        <textarea rows="3" required={hasCritical} value={note} onChange={(e) => setNote(e.target.value)} placeholder={hasCritical ? 'Wajib jelaskan temuan kritis...' : 'Tambahkan catatan bila diperlukan...'} className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2.5 font-normal outline-none focus:ring-2 focus:ring-blue-500" />
       </label>
       <label className="mt-4 block text-xs font-bold text-slate-700">Foto Bukti (opsional)
         <input type="file" accept="image/*" onChange={(e) => setPhoto(e.target.files?.[0] || null)} className="mt-1 w-full rounded-xl border border-slate-300 p-2 text-xs font-normal" />
       </label>
-      <button disabled={loading} className="mt-5 w-full rounded-xl bg-emerald-700 px-4 py-3 text-xs font-bold text-white shadow-lg shadow-emerald-700/20 transition hover:bg-emerald-600 disabled:opacity-50">{loading ? 'Menyimpan...' : 'Simpan Hasil Patroli'}</button>
+      <button disabled={loading} className="mt-5 w-full rounded-xl bg-blue-700 px-4 py-3 text-xs font-bold text-white shadow-lg shadow-blue-700/20 transition hover:bg-blue-600 disabled:opacity-50">{loading ? 'Menyimpan...' : 'Simpan Hasil Patroli'}</button>
     </form>
     </>
   );

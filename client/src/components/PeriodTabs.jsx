@@ -24,7 +24,7 @@ export default function PeriodTabs({ selectedPeriod, onChange, counts = {} }) {
             onClick={() => onChange(tab.id)}
             className={`flex items-center space-x-2 px-3.5 py-2 rounded-xl text-xs font-semibold transition-all ${
               isActive
-                ? 'bg-emerald-700 text-white shadow-sm shadow-emerald-700/30'
+                ? 'bg-blue-700 text-white shadow-sm shadow-blue-700/30'
                 : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
             }`}
           >
@@ -34,7 +34,7 @@ export default function PeriodTabs({ selectedPeriod, onChange, counts = {} }) {
               <span
                 className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ${
                   isActive
-                    ? 'bg-emerald-800 text-emerald-100'
+                    ? 'bg-blue-800 text-blue-100'
                     : 'bg-slate-200 text-slate-700'
                 }`}
               >

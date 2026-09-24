@@ -27,7 +27,7 @@ export default function Dashboard({ refreshKey, onNavigate }) {
     <div className="space-y-6">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-wider text-emerald-700">Ringkasan kinerja</p>
+          <p className="text-xs font-semibold uppercase tracking-wider text-blue-700">Ringkasan kinerja</p>
           <h2 className="mt-1 text-2xl font-extrabold text-slate-900">Dashboard Utama</h2>
           <p className="mt-2 text-sm font-semibold text-slate-600">
             Assalamualaikum {user?.nama}, semoga selalu semangat bekerja.
@@ -48,7 +48,7 @@ export default function Dashboard({ refreshKey, onNavigate }) {
 
       <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
         <h3 className="flex items-center gap-2 text-sm font-bold text-slate-800">
-          <Activity className="h-4 w-4 text-emerald-600" /> Rekap per Bidang
+          <Activity className="h-4 w-4 text-blue-600" /> Rekap per Bidang
         </h3>
         <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {data.departmentSummary.map((item) => (
@@ -56,18 +56,18 @@ export default function Dashboard({ refreshKey, onNavigate }) {
               type="button"
               key={item.id}
               onClick={() => onNavigate('tasks', { bidang_id: item.id })}
-              className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-left transition hover:border-emerald-300 hover:bg-emerald-50"
+              className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-left transition hover:border-blue-300 hover:bg-blue-50"
             >
               <div className="flex items-start justify-between gap-2">
                 <p className="text-sm font-extrabold text-slate-800">{item.nama_bidang}</p>
-                <span className="text-[10px] font-bold text-emerald-700">Lihat tugas</span>
+                <span className="text-[10px] font-bold text-blue-700">Lihat tugas</span>
               </div>
               <div className="mt-3 grid grid-cols-2 gap-2 text-center text-[11px]">
                 <span className="rounded-lg bg-white p-2">
                   <strong className="block text-lg text-slate-900">{item.total_tasks || 0}</strong>Total
                 </span>
-                <span className="rounded-lg bg-emerald-100 p-2">
-                  <strong className="block text-lg text-emerald-800">{item.completed_tasks || 0}</strong>Selesai
+                <span className="rounded-lg bg-blue-100 p-2">
+                  <strong className="block text-lg text-blue-800">{item.completed_tasks || 0}</strong>Selesai
                 </span>
                 <span className="rounded-lg bg-blue-100 p-2">
                   <strong className="block text-lg text-blue-800">{item.in_progress_tasks || 0}</strong>Dikerjakan
