@@ -106,7 +106,7 @@ export default function Users({ refreshKey, onRefresh }) {
     <div className="space-y-5">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-wider text-emerald-700">Akses dan akun</p>
+          <p className="text-xs font-semibold uppercase tracking-wider text-blue-700">Akses dan akun</p>
           <h2 className="mt-1 text-2xl font-extrabold text-slate-900">Data Pengguna</h2>
         </div>
         {isSuperAdmin && (
@@ -117,7 +117,7 @@ export default function Users({ refreshKey, onRefresh }) {
               setError('');
               setSuccess('');
             }}
-            className="flex items-center gap-2 rounded-xl bg-emerald-700 px-4 py-2.5 text-xs font-bold text-white hover:bg-emerald-600"
+            className="flex items-center gap-2 rounded-xl bg-blue-700 px-4 py-2.5 text-xs font-bold text-white hover:bg-blue-600"
           >
             <Plus className="h-4 w-4" /> Tambah Pengguna
           </button>
@@ -125,12 +125,12 @@ export default function Users({ refreshKey, onRefresh }) {
       </div>
 
       {error && <div className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs text-rose-700">{error}</div>}
-      {success && <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-xs text-emerald-700">{success}</div>}
+      {success && <div className="rounded-xl border border-blue-200 bg-blue-50 p-3 text-xs text-blue-700">{success}</div>}
 
       {showForm && isSuperAdmin && (
-        <form onSubmit={submit} className="rounded-2xl border border-emerald-200 bg-white p-5 shadow-sm">
+        <form onSubmit={submit} className="rounded-2xl border border-blue-200 bg-white p-5 shadow-sm">
           <div className="mb-4 flex items-center gap-2">
-            <UserPlus className="h-5 w-5 text-emerald-700" />
+            <UserPlus className="h-5 w-5 text-blue-700" />
             <div>
               <h3 className="text-sm font-bold text-slate-900">{editingId ? 'Edit Pengguna' : 'Tambah Pengguna Baru'}</h3>
               <p className="text-[11px] text-slate-500">Akun dapat digunakan setelah berhasil disimpan.</p>
@@ -139,7 +139,7 @@ export default function Users({ refreshKey, onRefresh }) {
           <div className="grid gap-3 sm:grid-cols-2">
             <label className="text-xs font-bold text-slate-700">
               Nama Lengkap *
-              <input required value={form.nama} onChange={(e) => updateField('nama', e.target.value)} className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 text-sm font-normal outline-none focus:ring-2 focus:ring-emerald-500" />
+              <input required value={form.nama} onChange={(e) => updateField('nama', e.target.value)} className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 text-sm font-normal outline-none focus:ring-2 focus:ring-blue-500" />
             </label>
             <label className="flex items-center gap-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs font-bold text-amber-900">
               <input type="checkbox" checked={Boolean(form.can_patroli)} onChange={(e) => updateField('can_patroli', e.target.checked)} className="h-4 w-4 accent-amber-600" />
@@ -147,15 +147,15 @@ export default function Users({ refreshKey, onRefresh }) {
             </label>
             <label className="text-xs font-bold text-slate-700">
               Email *
-              <input required type="email" value={form.email} onChange={(e) => updateField('email', e.target.value)} className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 text-sm font-normal outline-none focus:ring-2 focus:ring-emerald-500" />
+              <input required type="email" value={form.email} onChange={(e) => updateField('email', e.target.value)} className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 text-sm font-normal outline-none focus:ring-2 focus:ring-blue-500" />
             </label>
             <label className="text-xs font-bold text-slate-700">
               Password {editingId ? '(kosongkan jika tidak diubah)' : '*'}
-              <input required={!editingId} minLength="6" type="password" value={form.password} onChange={(e) => updateField('password', e.target.value)} className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 text-sm font-normal outline-none focus:ring-2 focus:ring-emerald-500" />
+              <input required={!editingId} minLength="6" type="password" value={form.password} onChange={(e) => updateField('password', e.target.value)} className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 text-sm font-normal outline-none focus:ring-2 focus:ring-blue-500" />
             </label>
             <label className="text-xs font-bold text-slate-700">
               Role *
-              <select required value={form.role} onChange={(e) => updateField('role', e.target.value)} className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-normal outline-none focus:ring-2 focus:ring-emerald-500">
+              <select required value={form.role} onChange={(e) => updateField('role', e.target.value)} className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-normal outline-none focus:ring-2 focus:ring-blue-500">
                 <option value="STAF">STAF</option>
                 <option value="KABID">KABID</option>
                 <option value="WAKIL_MUDIR">WAKIL_MUDIR (Legacy)</option>
@@ -167,18 +167,18 @@ export default function Users({ refreshKey, onRefresh }) {
             </label>
             <label className="text-xs font-bold text-slate-700">
               Bidang
-              <select value={form.bidang_id} onChange={(e) => updateField('bidang_id', e.target.value)} className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-normal outline-none focus:ring-2 focus:ring-emerald-500">
+              <select value={form.bidang_id} onChange={(e) => updateField('bidang_id', e.target.value)} className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-normal outline-none focus:ring-2 focus:ring-blue-500">
                 <option value="">Tidak ditentukan</option>
                 {bidang.map((item) => <option key={item.id} value={item.id}>{item.nama_bidang} ({item.kode_bidang})</option>)}
               </select>
             </label>
             <label className="text-xs font-bold text-slate-700">
               Jabatan
-              <input value={form.jabatan} onChange={(e) => updateField('jabatan', e.target.value)} className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 text-sm font-normal outline-none focus:ring-2 focus:ring-emerald-500" />
+              <input value={form.jabatan} onChange={(e) => updateField('jabatan', e.target.value)} className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 text-sm font-normal outline-none focus:ring-2 focus:ring-blue-500" />
             </label>
             <label className="text-xs font-bold text-slate-700">
               Sub-Bidang / Unit
-              <input placeholder="Contoh: Masjid, Asrama, Publikasi" value={form.sub_bidang} onChange={(e) => updateField('sub_bidang', e.target.value)} className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 text-sm font-normal outline-none focus:ring-2 focus:ring-emerald-500" />
+              <input placeholder="Contoh: Masjid, Asrama, Publikasi" value={form.sub_bidang} onChange={(e) => updateField('sub_bidang', e.target.value)} className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 text-sm font-normal outline-none focus:ring-2 focus:ring-blue-500" />
             </label>
             <label className="text-xs font-bold text-slate-700">
               Nomor WhatsApp
@@ -187,7 +187,7 @@ export default function Users({ refreshKey, onRefresh }) {
           </div>
           <div className="mt-4 flex justify-end gap-2">
             <button type="button" onClick={() => { setShowForm(false); setEditingId(null); setForm(initialForm); }} className="rounded-xl px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100"><X className="mr-1 inline h-3.5 w-3.5" />Batal</button>
-            <button disabled={loading} className="rounded-xl bg-emerald-700 px-4 py-2 text-xs font-bold text-white disabled:opacity-50">{loading ? 'Menyimpan...' : editingId ? 'Simpan Perubahan' : 'Simpan Pengguna'}</button>
+            <button disabled={loading} className="rounded-xl bg-blue-700 px-4 py-2 text-xs font-bold text-white disabled:opacity-50">{loading ? 'Menyimpan...' : editingId ? 'Simpan Perubahan' : 'Simpan Pengguna'}</button>
           </div>
         </form>
       )}
@@ -198,7 +198,7 @@ export default function Users({ refreshKey, onRefresh }) {
             <tr><th className="p-3">Nama</th><th className="p-3">Email</th><th className="p-3">WhatsApp</th><th className="p-3">Role</th><th className="p-3">Bidang / Unit</th><th className="p-3">Patroli</th><th className="p-3">Jabatan</th>{isSuperAdmin && <th className="p-3">Aksi</th>}</tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
-            {users.map((item) => <tr key={item.id}><td className="p-3 font-semibold text-slate-800">{item.nama}</td><td className="p-3">{item.email}</td><td className="p-3">{item.no_telepon || '-'}</td><td className="p-3">{item.role}</td><td className="p-3">{item.nama_bidang || '-'}{item.sub_bidang && <span className="block text-[10px] text-emerald-700">{item.sub_bidang}</span>}</td><td className="p-3">{isSuperAdmin ? <button type="button" onClick={() => togglePatrolAccess(item)} className={`relative h-6 w-11 rounded-full transition ${item.can_patroli ? 'bg-amber-500' : 'bg-slate-300'}`} aria-label={`Ubah hak patroli ${item.nama}`}><span className={`absolute top-1 h-4 w-4 rounded-full bg-white transition ${item.can_patroli ? 'left-6' : 'left-1'}`} /></button> : item.can_patroli ? 'Aktif' : '-'}</td><td className="p-3">{item.jabatan || '-'}</td>{isSuperAdmin && <td className="p-3"><div className="flex gap-1"><button onClick={() => editUser(item)} className="rounded-lg p-1.5 text-blue-600 hover:bg-blue-50"><Edit2 className="h-3.5 w-3.5" /></button><button onClick={() => removeUser(item.id)} className="rounded-lg p-1.5 text-rose-600 hover:bg-rose-50"><Trash2 className="h-3.5 w-3.5" /></button></div></td>}</tr>)}
+            {users.map((item) => <tr key={item.id}><td className="p-3 font-semibold text-slate-800">{item.nama}</td><td className="p-3">{item.email}</td><td className="p-3">{item.no_telepon || '-'}</td><td className="p-3">{item.role}</td><td className="p-3">{item.nama_bidang || '-'}{item.sub_bidang && <span className="block text-[10px] text-blue-700">{item.sub_bidang}</span>}</td><td className="p-3">{isSuperAdmin ? <button type="button" onClick={() => togglePatrolAccess(item)} className={`relative h-6 w-11 rounded-full transition ${item.can_patroli ? 'bg-amber-500' : 'bg-slate-300'}`} aria-label={`Ubah hak patroli ${item.nama}`}><span className={`absolute top-1 h-4 w-4 rounded-full bg-white transition ${item.can_patroli ? 'left-6' : 'left-1'}`} /></button> : item.can_patroli ? 'Aktif' : '-'}</td><td className="p-3">{item.jabatan || '-'}</td>{isSuperAdmin && <td className="p-3"><div className="flex gap-1"><button onClick={() => editUser(item)} className="rounded-lg p-1.5 text-blue-600 hover:bg-blue-50"><Edit2 className="h-3.5 w-3.5" /></button><button onClick={() => removeUser(item.id)} className="rounded-lg p-1.5 text-rose-600 hover:bg-rose-50"><Trash2 className="h-3.5 w-3.5" /></button></div></td>}</tr>)}
             {!users.length && <tr><td colSpan={isSuperAdmin ? 6 : 5} className="p-8 text-center text-slate-400">Belum ada data pengguna.</td></tr>}
           </tbody>
         </table>

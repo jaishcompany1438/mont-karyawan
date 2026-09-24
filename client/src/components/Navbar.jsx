@@ -19,7 +19,7 @@ export default function Navbar({ onMenuToggle }) {
       case 'WADIR_PENGS':
         return { label: 'Wadir Pengasuhan', bg: 'bg-cyan-100 text-cyan-800 border-cyan-200' };
       case 'KABID':
-        return { label: 'Kepala Bidang', bg: 'bg-emerald-100 text-emerald-800 border-emerald-200' };
+        return { label: 'Kepala Bidang', bg: 'bg-blue-100 text-blue-800 border-blue-200' };
       case 'STAF':
         return { label: 'Staf Pelaksana', bg: 'bg-blue-100 text-blue-800 border-blue-200' };
       default:
@@ -30,7 +30,7 @@ export default function Navbar({ onMenuToggle }) {
   const badge = getRoleBadge(user?.role);
 
   return (
-    <header className="sticky top-0 z-30 bg-white border-b border-slate-200 shadow-sm">
+    <header className="sticky top-0 z-30 border-b border-blue-100 bg-white/95 shadow-sm backdrop-blur">
       <div className="px-4 sm:px-6 lg:px-8 py-3 flex items-center justify-between">
         <div className="flex items-center space-x-3">
           <button
@@ -43,7 +43,7 @@ export default function Navbar({ onMenuToggle }) {
             </svg>
           </button>
           <div className="flex items-center space-x-2.5">
-            <div className="w-10 h-10 rounded-xl bg-emerald-700 flex items-center justify-center text-white font-bold shadow-md shadow-emerald-700/20">
+            <div className="w-10 h-10 rounded-xl app-blue-gradient flex items-center justify-center text-white font-bold shadow-md shadow-blue-700/20">
               <img
                 src="/logo.svg"
                 alt="Logo PTQ Imam Ath Thobari"
@@ -51,7 +51,7 @@ export default function Navbar({ onMenuToggle }) {
               />
             </div>
             <div>
-              <h1 className="text-base font-bold text-slate-900 leading-tight">
+              <h1 className="text-base font-bold app-blue-green-text leading-tight">
                 Monitoring Karyawan & Bidang
               </h1>
               <p className="text-xs text-slate-500 font-medium">

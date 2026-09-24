@@ -69,10 +69,10 @@ export default function StatCards({ stats = {}, activeFilter, onCardClick }) {
       count: completed,
       desc: 'Telah disetujui tuntas',
       icon: CheckCircle2,
-      textColor: 'text-emerald-900',
-      bgColor: 'bg-emerald-50/50',
-      borderColor: 'border-emerald-200',
-      iconBg: 'bg-emerald-100 text-emerald-700'
+      textColor: 'text-blue-900',
+      bgColor: 'bg-blue-50/50',
+      borderColor: 'border-blue-200',
+      iconBg: 'bg-blue-100 text-blue-700'
     },
     {
       id: 'OVERDUE',
@@ -101,7 +101,7 @@ export default function StatCards({ stats = {}, activeFilter, onCardClick }) {
               card.bgColor
             } ${card.borderColor} ${
               onCardClick ? 'cursor-pointer hover:shadow-md' : ''
-            } ${isSelected ? 'ring-2 ring-emerald-600 shadow-md' : 'shadow-sm'}`}
+            } ${isSelected ? 'ring-2 ring-blue-600 shadow-md' : 'shadow-sm'}`}
           >
             <div className="flex items-center justify-between mb-2">
               <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider line-clamp-1">

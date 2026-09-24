@@ -108,7 +108,7 @@ export default function SubmitWorkModal({ isOpen, onClose, onSuccess, task }) {
             <input
               type="file"
               onChange={(e) => setFile(e.target.files[0] || null)}
-              className="w-full text-xs text-slate-500 file:mr-3 file:py-2.5 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-emerald-50 file:text-emerald-700 hover:file:bg-emerald-100 border border-slate-200 rounded-xl"
+              className="w-full text-xs text-slate-500 file:mr-3 file:py-2.5 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 border border-slate-200 rounded-xl"
             />
           </div>
 
@@ -119,7 +119,7 @@ export default function SubmitWorkModal({ isOpen, onClose, onSuccess, task }) {
               value={kendala}
               onChange={(e) => setKendala(e.target.value)}
               placeholder="Tuliskan kendala yang ditemukan selama pelaksanaan tugas..."
-              className="w-full rounded-xl border border-slate-300 px-3.5 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+              className="w-full rounded-xl border border-slate-300 px-3.5 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
 
@@ -130,7 +130,7 @@ export default function SubmitWorkModal({ isOpen, onClose, onSuccess, task }) {
               value={solusi}
               onChange={(e) => setSolusi(e.target.value)}
               placeholder="Tuliskan solusi atau tindak lanjut yang dilakukan..."
-              className="w-full rounded-xl border border-slate-300 px-3.5 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+              className="w-full rounded-xl border border-slate-300 px-3.5 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
 
@@ -144,7 +144,7 @@ export default function SubmitWorkModal({ isOpen, onClose, onSuccess, task }) {
               placeholder="Contoh: Pekerjaan telah diselesaikan sesuai instruksi, berkas terlampir di atas..."
               value={keterangan}
               onChange={(e) => setKeterangan(e.target.value)}
-              className="w-full px-3.5 py-2 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-emerald-500 text-slate-800"
+              className="w-full px-3.5 py-2 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-800"
             />
           </div>
 
@@ -160,7 +160,7 @@ export default function SubmitWorkModal({ isOpen, onClose, onSuccess, task }) {
             <button
               type="submit"
               disabled={loading}
-              className="px-5 py-2 rounded-xl bg-emerald-700 hover:bg-emerald-600 text-white font-bold shadow-md shadow-emerald-700/20 disabled:opacity-50 flex items-center space-x-1.5"
+              className="px-5 py-2 rounded-xl bg-blue-700 hover:bg-blue-600 text-white font-bold shadow-md shadow-blue-700/20 disabled:opacity-50 flex items-center space-x-1.5"
             >
               <CheckCircle className="w-4 h-4" />
               <span>{loading ? 'Mengirim...' : 'Submit for Review'}</span>

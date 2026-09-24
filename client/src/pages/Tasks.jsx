@@ -63,10 +63,10 @@ export default function Tasks({ refreshKey, onRefresh, onOpenCreateTask, onOpenE
 
   return (
     <div className="space-y-5">
-      <div className="flex flex-wrap items-end justify-between gap-3"><div><p className="text-xs font-semibold uppercase tracking-wider text-emerald-700">Pelacakan pekerjaan</p><h2 className="mt-1 text-2xl font-extrabold text-slate-900">Manajemen Tugas</h2>{bidangId && <p className="mt-1 text-xs font-semibold text-slate-500">Filter bidang aktif</p>}</div><button onClick={onOpenCreateTask} className="rounded-xl bg-emerald-700 px-4 py-2.5 text-xs font-bold text-white hover:bg-emerald-600">+ Buat Tugas</button></div>
+      <div className="flex flex-wrap items-end justify-between gap-3"><div><p className="text-xs font-semibold uppercase tracking-wider text-blue-700">Pelacakan pekerjaan</p><h2 className="mt-1 text-2xl font-extrabold text-slate-900">Manajemen Tugas</h2>{bidangId && <p className="mt-1 text-xs font-semibold text-slate-500">Filter bidang aktif</p>}</div><button onClick={onOpenCreateTask} className="rounded-xl bg-blue-700 px-4 py-2.5 text-xs font-bold text-white hover:bg-blue-600">+ Buat Tugas</button></div>
       {error && <div className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs text-rose-700">{error}</div>}
       <PeriodTabs selectedPeriod={period} onChange={setPeriod} />
-      <div className="flex flex-wrap items-center justify-between gap-3"><label className="flex min-w-[220px] flex-1 items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-400"><Search className="h-4 w-4" /><input className="w-full outline-none" placeholder="Cari judul, deskripsi, atau penerima..." value={search} onChange={(e) => setSearch(e.target.value)} /></label><div className="flex gap-2"><button onClick={() => setFiltersOpen((value) => !value)} className={`rounded-xl border px-3 py-2 text-xs font-bold ${filtersOpen ? 'border-emerald-300 bg-emerald-50 text-emerald-700' : 'border-slate-200 bg-white text-slate-600'}`}>Filter Detail</button><div className="flex rounded-xl border border-slate-200 bg-white p-1"><button onClick={() => setView('kanban')} className={`rounded-lg p-2 ${view === 'kanban' ? 'bg-emerald-100 text-emerald-700' : 'text-slate-500'}`}><LayoutGrid className="h-4 w-4" /></button><button onClick={() => setView('table')} className={`rounded-lg p-2 ${view === 'table' ? 'bg-emerald-100 text-emerald-700' : 'text-slate-500'}`}><List className="h-4 w-4" /></button></div></div></div>
+      <div className="flex flex-wrap items-center justify-between gap-3"><label className="flex min-w-[220px] flex-1 items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-400"><Search className="h-4 w-4" /><input className="w-full outline-none" placeholder="Cari judul, deskripsi, atau penerima..." value={search} onChange={(e) => setSearch(e.target.value)} /></label><div className="flex gap-2"><button onClick={() => setFiltersOpen((value) => !value)} className={`rounded-xl border px-3 py-2 text-xs font-bold ${filtersOpen ? 'border-blue-300 bg-blue-50 text-blue-700' : 'border-slate-200 bg-white text-slate-600'}`}>Filter Detail</button><div className="flex rounded-xl border border-slate-200 bg-white p-1"><button onClick={() => setView('kanban')} className={`rounded-lg p-2 ${view === 'kanban' ? 'bg-blue-100 text-blue-700' : 'text-slate-500'}`}><LayoutGrid className="h-4 w-4" /></button><button onClick={() => setView('table')} className={`rounded-lg p-2 ${view === 'table' ? 'bg-blue-100 text-blue-700' : 'text-slate-500'}`}><List className="h-4 w-4" /></button></div></div></div>
       <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1 md:hidden" aria-label="Filter status tugas">
         {MOBILE_STATUS_FILTERS.map(([value, label]) => (
           <button
@@ -75,8 +75,8 @@ export default function Tasks({ refreshKey, onRefresh, onOpenCreateTask, onOpenE
             onClick={() => setStatus(value)}
             className={`shrink-0 whitespace-nowrap rounded-full border px-3 py-2 text-[11px] font-bold transition ${
               status === value
-                ? 'border-emerald-600 bg-emerald-700 text-white shadow-sm'
-                : 'border-slate-200 bg-white text-slate-600 hover:border-emerald-300 hover:bg-emerald-50 hover:text-emerald-700'
+                ? 'border-blue-600 bg-blue-700 text-white shadow-sm'
+                : 'border-slate-200 bg-white text-slate-600 hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700'
             }`}
           >
             {label}

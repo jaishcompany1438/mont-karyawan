@@ -27,7 +27,7 @@ export default function KanbanBoard({
     { id: 'IN_PROGRESS', title: 'Sedang Dikerjakan', color: 'border-blue-300 bg-blue-50/70 text-blue-700' },
     { id: 'UNDER_REVIEW', title: 'Menunggu Review', color: 'border-amber-300 bg-amber-50/70 text-amber-800' },
     { id: 'REVISION', title: 'Perlu Revisi', color: 'border-orange-300 bg-orange-50/70 text-orange-800' },
-    { id: 'COMPLETED', title: 'Selesai (Approved)', color: 'border-emerald-300 bg-emerald-50/70 text-emerald-800' },
+    { id: 'COMPLETED', title: 'Selesai (Approved)', color: 'border-blue-300 bg-blue-50/70 text-blue-800' },
   ];
 
   const getPriorityBadge = (p) => {
@@ -42,7 +42,7 @@ export default function KanbanBoard({
 
   const getPeriodBadge = (period) => {
     switch (period) {
-      case 'HARIAN': return 'bg-emerald-50 text-emerald-700 border-emerald-200';
+      case 'HARIAN': return 'bg-blue-50 text-blue-700 border-blue-200';
       case 'PEKANAN': return 'bg-indigo-50 text-indigo-700 border-indigo-200';
       case 'BULANAN': return 'bg-purple-50 text-purple-700 border-purple-200';
       case 'TAHUNAN': return 'bg-cyan-50 text-cyan-700 border-cyan-200';
@@ -107,7 +107,7 @@ export default function KanbanBoard({
                       {/* Title */}
                       <h4
                         onClick={() => onOpenEditTask && onOpenEditTask(task)}
-                        className="text-xs font-bold text-slate-800 hover:text-emerald-700 cursor-pointer line-clamp-2 leading-snug mb-1"
+                        className="text-xs font-bold text-slate-800 hover:text-blue-700 cursor-pointer line-clamp-2 leading-snug mb-1"
                       >
                         {task.judul}
                       </h4>
@@ -139,7 +139,7 @@ export default function KanbanBoard({
                       </div>
                       <div className="mb-2 text-[10px] text-slate-500">
                         Anggaran: Rp {Number(task.anggaran_dana || 0).toLocaleString('id-ID')} · Sisa: Rp {(Number(task.anggaran_dana || 0) - Number(task.anggaran_terpakai || 0)).toLocaleString('id-ID')}
-                        {task.assignee_no_telepon && <a className="ml-2 font-semibold text-emerald-700 hover:underline" href={`https://wa.me/${String(task.assignee_no_telepon).replace(/\D/g, '').replace(/^0/, '62')}`} target="_blank" rel="noreferrer">WhatsApp</a>}
+                        {task.assignee_no_telepon && <a className="ml-2 font-semibold text-blue-700 hover:underline" href={`https://wa.me/${String(task.assignee_no_telepon).replace(/\D/g, '').replace(/^0/, '62')}`} target="_blank" rel="noreferrer">WhatsApp</a>}
                       </div>
 
                       {/* Due Date & Proof Indicators */}
@@ -167,7 +167,7 @@ export default function KanbanBoard({
                             </a>
                           )}
                           {task.bukti_kerja && (
-                            <span title="Bukti Kerja Ada" className="text-emerald-600">
+                            <span title="Bukti Kerja Ada" className="text-blue-600">
                               <FileCheck className="w-3 h-3" />
                             </span>
                           )}
@@ -190,7 +190,7 @@ export default function KanbanBoard({
                         {['IN_PROGRESS', 'REVISION'].includes(task.status) && (isAssignee || role === 'SUPER_ADMIN') && (
                           <button
                             onClick={() => onOpenSubmitWork(task)}
-                            className="w-full py-1 px-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-semibold transition-colors shadow-xs"
+                            className="w-full py-1 px-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-[11px] font-semibold transition-colors shadow-xs"
                           >
                             {task.status === 'REVISION' ? 'Kirim Ulang Bukti' : 'Kirim Bukti Kerja'}
                           </button>
@@ -208,7 +208,7 @@ export default function KanbanBoard({
 
                         {/* Completed action indicator */}
                         {task.status === 'COMPLETED' && (
-                          <span className="text-[11px] text-emerald-700 font-medium flex items-center">
+                          <span className="text-[11px] text-blue-700 font-medium flex items-center">
                             <CheckCircle className="w-3.5 h-3.5 mr-1" /> Selesai
                           </span>
                         )}

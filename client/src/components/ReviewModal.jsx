@@ -110,8 +110,8 @@ export default function ReviewModal({ isOpen, onClose, onSuccess, task }) {
           </div>
 
           {/* Work Proof Submitted */}
-          <div className="p-4 bg-emerald-50/50 border border-emerald-200 rounded-2xl">
-            <span className="text-[10px] font-bold text-emerald-800 uppercase flex items-center mb-1">
+          <div className="p-4 bg-blue-50/50 border border-blue-200 rounded-2xl">
+            <span className="text-[10px] font-bold text-blue-800 uppercase flex items-center mb-1">
               <FileText className="w-3 h-3 mr-1" /> Bukti Kerja Yang Dikirimkan
             </span>
             {task.bukti_kerja ? (
@@ -121,13 +121,13 @@ export default function ReviewModal({ isOpen, onClose, onSuccess, task }) {
                     href={task.bukti_kerja}
                     target="_blank"
                     rel="noreferrer"
-                    className="inline-flex items-center px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold transition-colors shadow-xs"
+                    className="inline-flex items-center px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold transition-colors shadow-xs"
                   >
                     <Paperclip className="w-3.5 h-3.5 mr-1.5" /> Buka / Unduh Berkas Bukti Kerja
                   </a>
                 </div>
               ) : (
-                <p className="p-2.5 bg-white border border-emerald-200 rounded-xl text-slate-800 mt-1 whitespace-pre-wrap">
+                <p className="p-2.5 bg-white border border-blue-200 rounded-xl text-slate-800 mt-1 whitespace-pre-wrap">
                   {task.bukti_kerja}
                 </p>
               )
@@ -152,7 +152,7 @@ export default function ReviewModal({ isOpen, onClose, onSuccess, task }) {
                   step="0.1"
                   value={ratings[key]}
                   onChange={(e) => setRatings((current) => ({ ...current, [key]: e.target.value }))}
-                  className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 font-normal text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 font-normal text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </label>
             ))}
@@ -166,7 +166,7 @@ export default function ReviewModal({ isOpen, onClose, onSuccess, task }) {
               placeholder="Catatan penilaian untuk dokumentasi laporan..."
               value={catatanReviewer}
               onChange={(e) => setCatatanReviewer(e.target.value)}
-              className="w-full px-3.5 py-2 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-emerald-500 text-slate-800"
+              className="w-full px-3.5 py-2 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-800"
             />
           </div>
           <div>
@@ -178,7 +178,7 @@ export default function ReviewModal({ isOpen, onClose, onSuccess, task }) {
               placeholder="Jelaskan bagian mana yang perlu diperbaiki oleh staf..."
               value={catatanRevisi}
               onChange={(e) => setCatatanRevisi(e.target.value)}
-              className="w-full px-3.5 py-2 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-emerald-500 text-slate-800"
+              className="w-full px-3.5 py-2 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-800"
             />
           </div>
 
@@ -200,7 +200,7 @@ export default function ReviewModal({ isOpen, onClose, onSuccess, task }) {
               type="button"
               disabled={loading}
               onClick={() => handleAction('APPROVE')}
-              className="flex-1 py-2.5 px-4 bg-emerald-700 hover:bg-emerald-600 text-white rounded-xl font-bold transition-colors shadow-md shadow-emerald-700/20 flex items-center justify-center space-x-1.5 disabled:opacity-50"
+              className="flex-1 py-2.5 px-4 bg-blue-700 hover:bg-blue-600 text-white rounded-xl font-bold transition-colors shadow-md shadow-blue-700/20 flex items-center justify-center space-x-1.5 disabled:opacity-50"
             >
               <CheckCircle className="w-4 h-4" />
               <span>Setujui Selesai (Approve)</span>

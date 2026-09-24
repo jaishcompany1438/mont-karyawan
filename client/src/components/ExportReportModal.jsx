@@ -112,13 +112,13 @@ export default function ExportReportModal({ isOpen, onClose, filters = {} }) {
         <fieldset className="mt-4 rounded-xl border border-slate-200 p-3">
           <legend className="px-1 text-xs font-bold text-slate-700">Kolom Laporan</legend>
           <div className="grid grid-cols-2 gap-2 text-xs">
-            <label className="flex items-center gap-2 text-slate-500"><input type="checkbox" checked disabled className="accent-emerald-700" />Judul Tugas (wajib)</label>
-            <label className="flex items-center gap-2 text-slate-500"><input type="checkbox" checked disabled className="accent-emerald-700" />Periode (wajib)</label>
-            {OPTIONAL_COLUMNS.map(([key, label]) => <label key={key} className="flex items-center gap-2 text-slate-700"><input type="checkbox" checked={selectedColumns.includes(key)} onChange={() => toggleColumn(key)} className="accent-emerald-700" />{label}</label>)}
+            <label className="flex items-center gap-2 text-slate-500"><input type="checkbox" checked disabled className="accent-blue-700" />Judul Tugas (wajib)</label>
+            <label className="flex items-center gap-2 text-slate-500"><input type="checkbox" checked disabled className="accent-blue-700" />Periode (wajib)</label>
+            {OPTIONAL_COLUMNS.map(([key, label]) => <label key={key} className="flex items-center gap-2 text-slate-700"><input type="checkbox" checked={selectedColumns.includes(key)} onChange={() => toggleColumn(key)} className="accent-blue-700" />{label}</label>)}
           </div>
         </fieldset>
         {error && <p className="mt-3 rounded-lg bg-rose-50 p-2 text-xs text-rose-700">{error}</p>}
-        <button disabled={loading} onClick={download} className="mt-5 flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-700 px-4 py-2.5 text-xs font-bold text-white disabled:opacity-50">
+        <button disabled={loading} onClick={download} className="mt-5 flex w-full items-center justify-center gap-2 rounded-xl bg-blue-700 px-4 py-2.5 text-xs font-bold text-white disabled:opacity-50">
           <Download className="h-4 w-4" /> {loading ? 'Menyiapkan...' : `Download ${format === 'pdf' ? 'PDF' : 'Excel'}`}
         </button>
       </div>

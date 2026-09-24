@@ -173,7 +173,7 @@ export default function TaskModal({ isOpen, onClose, onSuccess, initialTask = nu
               placeholder="Contoh: Pembuatan Modul Tahfizh Pekanan"
               value={judul}
               onChange={(e) => setJudul(e.target.value)}
-              className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-emerald-500 text-slate-800"
+              className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-800"
             />
           </div>
 
@@ -185,7 +185,7 @@ export default function TaskModal({ isOpen, onClose, onSuccess, initialTask = nu
               placeholder="Jelaskan instruksi tugas secara spesifik..."
               value={deskripsi}
               onChange={(e) => setDeskripsi(e.target.value)}
-              className="w-full px-3.5 py-2 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-emerald-500 text-slate-800"
+              className="w-full px-3.5 py-2 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-800"
             />
           </div>
 
@@ -196,7 +196,7 @@ export default function TaskModal({ isOpen, onClose, onSuccess, initialTask = nu
               <select
                 value={periode}
                 onChange={(e) => setPeriode(e.target.value)}
-                className="w-full px-3 py-2 rounded-xl border border-slate-300 focus:ring-2 focus:ring-emerald-500 text-slate-800 bg-white font-medium"
+                className="w-full px-3 py-2 rounded-xl border border-slate-300 focus:ring-2 focus:ring-blue-500 text-slate-800 bg-white font-medium"
               >
                 <option value="HARIAN">HARIAN (Daily)</option>
                 <option value="PEKANAN">PEKANAN (Weekly)</option>
@@ -207,7 +207,7 @@ export default function TaskModal({ isOpen, onClose, onSuccess, initialTask = nu
             </div>
             <div>
               <label className="block font-bold text-slate-700 mb-1">Anggaran Dana *</label>
-              <input required min="0" step="0.01" type="number" value={anggaranDana} onChange={(e) => setAnggaranDana(e.target.value)} className="w-full px-3 py-2 rounded-xl border border-slate-300 focus:ring-2 focus:ring-emerald-500 text-slate-800" />
+              <input required min="0" step="0.01" type="number" value={anggaranDana} onChange={(e) => setAnggaranDana(e.target.value)} className="w-full px-3 py-2 rounded-xl border border-slate-300 focus:ring-2 focus:ring-blue-500 text-slate-800" />
               <p className="mt-1 text-[10px] text-slate-500">Isi 0 jika tidak ada pengeluaran tunai.</p>
             </div>
 
@@ -216,7 +216,7 @@ export default function TaskModal({ isOpen, onClose, onSuccess, initialTask = nu
               <select
                 value={kategori}
                 onChange={(e) => setKategori(e.target.value)}
-                className="w-full px-3 py-2 rounded-xl border border-slate-300 focus:ring-2 focus:ring-emerald-500 text-slate-800 bg-white font-medium"
+                className="w-full px-3 py-2 rounded-xl border border-slate-300 focus:ring-2 focus:ring-blue-500 text-slate-800 bg-white font-medium"
               >
                 <option value="RUTIN">RUTIN</option>
                 <option value="PROYEK">PROYEK</option>
@@ -229,7 +229,7 @@ export default function TaskModal({ isOpen, onClose, onSuccess, initialTask = nu
               <select
                 value={prioritas}
                 onChange={(e) => setPrioritas(e.target.value)}
-                className="w-full px-3 py-2 rounded-xl border border-slate-300 focus:ring-2 focus:ring-emerald-500 text-slate-800 bg-white font-medium"
+                className="w-full px-3 py-2 rounded-xl border border-slate-300 focus:ring-2 focus:ring-blue-500 text-slate-800 bg-white font-medium"
               >
                 <option value="RENDAH">RENDAH</option>
                 <option value="SEDANG">SEDANG</option>
@@ -279,7 +279,7 @@ export default function TaskModal({ isOpen, onClose, onSuccess, initialTask = nu
                 required
                 value={assignedTo}
                 onChange={(e) => setAssignedTo(e.target.value)}
-                className="w-full px-3 py-2 rounded-xl border border-slate-300 focus:ring-2 focus:ring-emerald-500 text-slate-800 bg-white font-medium"
+                className="w-full px-3 py-2 rounded-xl border border-slate-300 focus:ring-2 focus:ring-blue-500 text-slate-800 bg-white font-medium"
               >
                 <option value="">-- Pilih Staf / Penerima --</option>
                 {assignees.map((u) => (
@@ -291,11 +291,11 @@ export default function TaskModal({ isOpen, onClose, onSuccess, initialTask = nu
             </div>
 
             {['HARIAN', 'PEKANAN', 'BULANAN'].includes(periode) && (
-              <label className="flex items-start gap-3 rounded-xl border border-emerald-200 bg-emerald-50/60 p-3">
-                <input type="checkbox" checked={isRecurring} onChange={(e) => setIsRecurring(e.target.checked)} className="mt-0.5 h-4 w-4 accent-emerald-700" />
+              <label className="flex items-start gap-3 rounded-xl border border-blue-200 bg-blue-50/60 p-3">
+                <input type="checkbox" checked={isRecurring} onChange={(e) => setIsRecurring(e.target.checked)} className="mt-0.5 h-4 w-4 accent-blue-700" />
                 <span>
-                  <span className="block font-bold text-emerald-900">Jadikan pekerjaan berulang</span>
-                  <span className="mt-0.5 block text-[11px] text-emerald-800">Instance tugas berikutnya dibuat otomatis setiap {periode === 'HARIAN' ? 'hari' : periode === 'PEKANAN' ? 'pekan' : 'bulan'} setelah tenggat.</span>
+                  <span className="block font-bold text-blue-900">Jadikan pekerjaan berulang</span>
+                  <span className="mt-0.5 block text-[11px] text-blue-800">Instance tugas berikutnya dibuat otomatis setiap {periode === 'HARIAN' ? 'hari' : periode === 'PEKANAN' ? 'pekan' : 'bulan'} setelah tenggat.</span>
                 </span>
               </label>
             )}
@@ -307,7 +307,7 @@ export default function TaskModal({ isOpen, onClose, onSuccess, initialTask = nu
                 required
                 value={dueDate}
                 onChange={(e) => setDueDate(e.target.value)}
-                className="w-full px-3 py-2 rounded-xl border border-slate-300 focus:ring-2 focus:ring-emerald-500 text-slate-800"
+                className="w-full px-3 py-2 rounded-xl border border-slate-300 focus:ring-2 focus:ring-blue-500 text-slate-800"
               />
             </div>
           </div>
@@ -318,7 +318,7 @@ export default function TaskModal({ isOpen, onClose, onSuccess, initialTask = nu
             <input
               type="file"
               onChange={(e) => setAttachment(e.target.files[0] || null)}
-              className="w-full text-xs text-slate-500 file:mr-3 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-emerald-50 file:text-emerald-700 hover:file:bg-emerald-100"
+              className="w-full text-xs text-slate-500 file:mr-3 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
             />
           </div>
 
@@ -326,7 +326,7 @@ export default function TaskModal({ isOpen, onClose, onSuccess, initialTask = nu
 
           <div className="flex shrink-0 items-center justify-end space-x-2 border-t border-slate-100 bg-white px-6 py-4">
             {success && (
-              <span className="mr-auto flex items-center gap-1.5 text-xs font-semibold text-emerald-700">
+              <span className="mr-auto flex items-center gap-1.5 text-xs font-semibold text-blue-700">
                 <CheckCircle2 className="h-4 w-4" />{success}
               </span>
             )}
@@ -340,7 +340,7 @@ export default function TaskModal({ isOpen, onClose, onSuccess, initialTask = nu
             <button
               type="submit"
               disabled={loading}
-              className="px-5 py-2 rounded-xl bg-emerald-700 hover:bg-emerald-600 text-white font-bold shadow-md shadow-emerald-700/20 disabled:opacity-50"
+              className="px-5 py-2 rounded-xl bg-blue-700 hover:bg-blue-600 text-white font-bold shadow-md shadow-blue-700/20 disabled:opacity-50"
             >
               {loading ? 'Menyimpan...' : initialTask ? 'Simpan Perubahan' : 'Terbitkan Tugas'}
             </button>

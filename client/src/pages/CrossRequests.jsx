@@ -112,7 +112,7 @@ export default function CrossRequests({ refreshKey, onRefresh }) {
 
   const getStatusBadge = (s) => {
     switch (s) {
-      case 'APPROVED': return { label: 'Disetujui', cls: 'bg-emerald-100 text-emerald-800 border-emerald-200' };
+      case 'APPROVED': return { label: 'Disetujui', cls: 'bg-blue-100 text-blue-800 border-blue-200' };
       case 'REJECTED': return { label: 'Ditolak', cls: 'bg-rose-100 text-rose-800 border-rose-200' };
       default: return { label: 'Menunggu Tanggapan', cls: 'bg-amber-100 text-amber-800 border-amber-200' };
     }
@@ -123,7 +123,7 @@ export default function CrossRequests({ refreshKey, onRefresh }) {
       {/* Header */}
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-wider text-emerald-700">Kolaborasi Antar Divisi</p>
+          <p className="text-xs font-semibold uppercase tracking-wider text-blue-700">Kolaborasi Antar Divisi</p>
           <h2 className="mt-1 text-2xl font-extrabold text-slate-900">Tugas Lintas Bidang</h2>
           <p className="mt-1 text-xs text-slate-500">
             Kelola permohonan pengerjaan tugas dan koordinasi antar bidang di lingkungan PTQ Imam Ath Thobari.
@@ -133,7 +133,7 @@ export default function CrossRequests({ refreshKey, onRefresh }) {
         <div className="flex items-center gap-2">
           <button
             onClick={() => setShowFormModal(true)}
-            className="flex items-center gap-2 rounded-xl bg-emerald-700 px-4 py-2.5 text-xs font-bold text-white shadow-md shadow-emerald-700/20 hover:bg-emerald-600 transition"
+            className="flex items-center gap-2 rounded-xl bg-blue-700 px-4 py-2.5 text-xs font-bold text-white shadow-md shadow-blue-700/20 hover:bg-blue-600 transition"
           >
             <PlusCircle className="h-4 w-4" />
             <span>+ Buat Pengajuan Tugas</span>
@@ -160,7 +160,7 @@ export default function CrossRequests({ refreshKey, onRefresh }) {
           <button
             onClick={() => setFilterType('ALL')}
             className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition ${
-              filterType === 'ALL' ? 'bg-emerald-700 text-white shadow-xs' : 'text-slate-600 hover:bg-slate-100'
+              filterType === 'ALL' ? 'bg-blue-700 text-white shadow-xs' : 'text-slate-600 hover:bg-slate-100'
             }`}
           >
             Semua ({requests.length})
@@ -168,7 +168,7 @@ export default function CrossRequests({ refreshKey, onRefresh }) {
           <button
             onClick={() => setFilterType('INCOMING')}
             className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition ${
-              filterType === 'INCOMING' ? 'bg-emerald-700 text-white shadow-xs' : 'text-slate-600 hover:bg-slate-100'
+              filterType === 'INCOMING' ? 'bg-blue-700 text-white shadow-xs' : 'text-slate-600 hover:bg-slate-100'
             }`}
           >
             Pengajuan Masuk
@@ -176,7 +176,7 @@ export default function CrossRequests({ refreshKey, onRefresh }) {
           <button
             onClick={() => setFilterType('OUTGOING')}
             className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition ${
-              filterType === 'OUTGOING' ? 'bg-emerald-700 text-white shadow-xs' : 'text-slate-600 hover:bg-slate-100'
+              filterType === 'OUTGOING' ? 'bg-blue-700 text-white shadow-xs' : 'text-slate-600 hover:bg-slate-100'
             }`}
           >
             Pengajuan Terkirim
@@ -189,7 +189,7 @@ export default function CrossRequests({ refreshKey, onRefresh }) {
           <select
             value={filterStatus}
             onChange={(e) => setFilterStatus(e.target.value)}
-            className="rounded-xl border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-slate-700 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-emerald-500"
+            className="rounded-xl border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-slate-700 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-blue-500"
           >
             <option value="">Semua Status</option>
             <option value="PENDING">Menunggu</option>
@@ -262,7 +262,7 @@ export default function CrossRequests({ refreshKey, onRefresh }) {
                     </div>
                     <div className="flex items-center justify-between border-t border-slate-200/60 pt-1">
                       <span className="text-slate-400">Bidang Tujuan:</span>
-                      <strong className="text-emerald-800">{item.target_bidang_nama}</strong>
+                      <strong className="text-blue-800">{item.target_bidang_nama}</strong>
                     </div>
                   </div>
 
@@ -278,7 +278,7 @@ export default function CrossRequests({ refreshKey, onRefresh }) {
                         href={item.file_attachment}
                         target="_blank"
                         rel="noreferrer"
-                        className="flex items-center gap-1 font-semibold text-emerald-700 hover:underline"
+                        className="flex items-center gap-1 font-semibold text-blue-700 hover:underline"
                       >
                         <Paperclip className="h-3 w-3" /> Berkas
                       </a>
@@ -294,7 +294,7 @@ export default function CrossRequests({ refreshKey, onRefresh }) {
                         setSelectedRequest(item);
                         setRespondAction('APPROVED');
                       }}
-                      className="flex-1 py-1.5 px-3 rounded-xl bg-emerald-700 hover:bg-emerald-600 text-white text-xs font-bold transition flex items-center justify-center gap-1"
+                      className="flex-1 py-1.5 px-3 rounded-xl bg-blue-700 hover:bg-blue-600 text-white text-xs font-bold transition flex items-center justify-center gap-1"
                     >
                       <CheckCircle className="h-3.5 w-3.5" />
                       <span>Setujui</span>
@@ -354,7 +354,7 @@ export default function CrossRequests({ refreshKey, onRefresh }) {
                   placeholder="Berikan catatan kepada pemohon..."
                   value={respondNotes}
                   onChange={(e) => setRespondNotes(e.target.value)}
-                  className="w-full rounded-xl border border-slate-300 p-2.5 text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  className="w-full rounded-xl border border-slate-300 p-2.5 text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>
 
@@ -374,7 +374,7 @@ export default function CrossRequests({ refreshKey, onRefresh }) {
                   disabled={respondLoading}
                   className={`rounded-xl px-4 py-2 font-bold text-white transition ${
                     respondAction === 'APPROVED'
-                      ? 'bg-emerald-700 hover:bg-emerald-600 shadow-md shadow-emerald-700/20'
+                      ? 'bg-blue-700 hover:bg-blue-600 shadow-md shadow-blue-700/20'
                       : 'bg-rose-700 hover:bg-rose-600 shadow-md shadow-rose-700/20'
                   }`}
                 >
