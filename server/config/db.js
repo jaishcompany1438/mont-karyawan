@@ -4,10 +4,11 @@ const dotenv = require('dotenv');
 dotenv.config();
 
 const dbConfig = {
+  // Connects directly to a standalone MySQL Server; XAMPP is not required.
   host: process.env.DB_HOST || 'localhost',
   user: process.env.DB_USER || 'root',
   password: process.env.DB_PASSWORD || '',
-  database: process.env.DB_NAME || 'monitoring',
+  database: process.env.DB_NAME || 'root',
   port: parseInt(process.env.DB_PORT || '3306', 10),
   waitForConnections: true,
   connectionLimit: 10,
@@ -27,6 +28,9 @@ function getPool() {
 
 async function initDB() {
   try {
+    if (!dbConfig.password) {
+      throw new Error('DB_PASSWORD belum diisi. Isi password MySQL pada file .env sebelum menjalankan server.');
+    }
     // Attempt connecting without specifying database to create it if needed
     const connection = await mysql.createConnection({
       host: dbConfig.host,
