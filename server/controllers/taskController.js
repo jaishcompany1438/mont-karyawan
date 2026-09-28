@@ -58,6 +58,18 @@ async function getTasks(req, res) {
     `;
     const params = [];
 
+    // Keep the task-management view focused: current month plus the previous month.
+    // Report endpoints intentionally do not use this default so historical exports remain available.
+    const now = new Date();
+    const displayStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const displayEnd = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+    const toSqlDateTime = (date) => {
+      const pad = (value) => String(value).padStart(2, '0');
+      return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
+    };
+    query += ' AND t.due_date >= ? AND t.due_date < ?';
+    params.push(toSqlDateTime(displayStart), toSqlDateTime(displayEnd));
+
     // RBAC filtering on visibility
     if (role === 'STAF') {
       // Staf only sees tasks assigned to them
