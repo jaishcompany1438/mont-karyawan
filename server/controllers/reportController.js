@@ -5,6 +5,19 @@ const PDFDocument = require('pdfkit');
 const SVGtoPDF = require('svg-to-pdfkit');
 const { getPool, isDbConnected } = require('../config/db');
 
+function getDashboardDateRange() {
+  const now = new Date();
+  const pad = (value) => String(value).padStart(2, '0');
+  const formatDate = (date) => (
+    `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} 00:00:00`
+  );
+
+  return {
+    start: formatDate(new Date(now.getFullYear(), now.getMonth() - 1, 1)),
+    end: formatDate(new Date(now.getFullYear(), now.getMonth() + 1, 1))
+  };
+}
+
 // GET /api/reports/dashboard
 async function getDashboardStats(req, res) {
   try {
@@ -16,8 +29,9 @@ async function getDashboardStats(req, res) {
     const { periode, bidang_id: filterBidangId } = req.query;
     const db = getPool();
 
-    let whereClause = '1=1';
-    const params = [];
+    const dashboardRange = getDashboardDateRange();
+    let whereClause = '1=1 AND due_date >= ? AND due_date < ?';
+    const params = [dashboardRange.start, dashboardRange.end];
 
     if (role === 'STAF') {
       whereClause += ' AND assigned_to = ?';
@@ -58,8 +72,8 @@ async function getDashboardStats(req, res) {
     `, params);
 
     // Distribution across all 4 periods
-    let periodParams = [];
-    let periodWhere = '1=1';
+    let periodParams = [dashboardRange.start, dashboardRange.end];
+    let periodWhere = '1=1 AND due_date >= ? AND due_date < ?';
     if (role === 'STAF') {
       periodWhere += ' AND assigned_to = ?';
       periodParams.push(userId);
@@ -102,11 +116,19 @@ async function getDashboardStats(req, res) {
           SUM(CASE WHEN t.status = 'UNDER_REVIEW' THEN 1 ELSE 0 END) AS under_review_tasks,
           SUM(CASE WHEN t.status != 'COMPLETED' AND t.due_date < NOW() THEN 1 ELSE 0 END) AS overdue_tasks
         FROM bidang b
-        LEFT JOIN tasks t ON b.id = t.bidang_id
+        LEFT JOIN tasks t
+          ON b.id = t.bidang_id
+         AND t.due_date >= ?
+         AND t.due_date < ?
         WHERE (? IS NULL OR b.parent_role = ?)
         GROUP BY b.id
         ORDER BY b.nama_bidang ASC
-      `, [role === 'WADIR_PEND' || role === 'WADIR_PENGS' ? role : null, role]);
+      `, [
+        dashboardRange.start,
+        dashboardRange.end,
+        role === 'WADIR_PEND' || role === 'WADIR_PENGS' ? role : null,
+        role
+      ]);
       departmentSummary = deptRows;
     }
 

@@ -15,7 +15,11 @@ function authenticateToken(req, res, next) {
     req.user = decoded;
     next();
   } catch (error) {
-    return res.status(403).json({ success: false, message: 'Sesi tidak valid atau telah berakhir. Silakan login kembali.' });
+    return res.status(401).json({
+      success: false,
+      code: 'AUTHENTICATION_REQUIRED',
+      message: 'Sesi tidak valid atau telah berakhir. Silakan login kembali.'
+    });
   }
 }
 
