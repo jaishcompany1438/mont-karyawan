@@ -37,6 +37,14 @@ export const api = {
     return handleResponse(res);
   },
 
+  async refreshToken() {
+    const res = await fetch(`${BASE_URL}/auth/refresh`, {
+      method: 'POST',
+      headers: getHeaders()
+    });
+    return handleResponse(res);
+  },
+
   async getMe() {
     const res = await fetch(`${BASE_URL}/auth/me`, {
       headers: getHeaders()

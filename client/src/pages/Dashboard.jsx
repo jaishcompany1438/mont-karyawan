@@ -32,6 +32,9 @@ export default function Dashboard({ refreshKey, onNavigate }) {
           <p className="mt-2 text-sm font-semibold text-slate-600">
             Assalamualaikum {user?.nama}, semoga selalu semangat bekerja.
           </p>
+          <p className="mt-1 text-xs font-medium text-slate-500">
+            Statistik menampilkan bulan ini dan satu bulan sebelumnya.
+          </p>
         </div>
         <button
           onClick={() => window.location.reload()}

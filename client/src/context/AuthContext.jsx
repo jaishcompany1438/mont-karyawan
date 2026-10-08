@@ -3,6 +3,18 @@ import { api } from '../services/api';
 
 const AuthContext = createContext(null);
 
+function getTokenExpiration(token) {
+  try {
+    const encodedPayload = token.split('.')[1];
+    if (!encodedPayload) return null;
+    const base64 = encodedPayload.replace(/-/g, '+').replace(/_/g, '/');
+    const payload = JSON.parse(window.atob(base64));
+    return Number.isFinite(payload.exp) ? payload.exp * 1000 : null;
+  } catch {
+    return null;
+  }
+}
+
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(() => {
     try {
@@ -37,6 +49,30 @@ export function AuthProvider({ children }) {
     const handleUnauthorized = () => logout();
     window.addEventListener('auth:unauthorized', handleUnauthorized);
     return () => window.removeEventListener('auth:unauthorized', handleUnauthorized);
+  }, [token]);
+
+  useEffect(() => {
+    if (!token) return undefined;
+
+    const expiresAt = getTokenExpiration(token);
+    if (!expiresAt) return undefined;
+
+    const refreshDelay = Math.max(expiresAt - Date.now() - 60 * 1000, 5000);
+    const refreshTimer = window.setTimeout(async () => {
+      try {
+        const res = await api.refreshToken();
+        if (!res.success || !res.token) {
+          logout();
+          return;
+        }
+        setToken(res.token);
+        localStorage.setItem('token', res.token);
+      } catch {
+        logout();
+      }
+    }, refreshDelay);
+
+    return () => window.clearTimeout(refreshTimer);
   }, [token]);
 
   const login = async (email, password) => {

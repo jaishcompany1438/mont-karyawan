@@ -3,6 +3,12 @@ const jwt = require('jsonwebtoken');
 const { getPool, isDbConnected } = require('../config/db');
 const { JWT_SECRET } = require('../middleware/auth');
 
+function signSessionToken(payload) {
+  return jwt.sign(payload, JWT_SECRET, {
+    expiresIn: process.env.JWT_EXPIRES_IN || '7d'
+  });
+}
+
 async function login(req, res) {
   try {
     const { email, password } = req.body;
@@ -51,7 +57,7 @@ async function login(req, res) {
       ,parent_role: user.parent_role
     };
 
-    const token = jwt.sign(payload, JWT_SECRET, { expiresIn: process.env.JWT_EXPIRES_IN || '7d' });
+    const token = signSessionToken(payload);
 
     return res.json({
       success: true,
@@ -62,6 +68,19 @@ async function login(req, res) {
   } catch (error) {
     console.error('Login error:', error);
     return res.status(500).json({ success: false, message: 'Terjadi kesalahan server saat login: ' + error.message });
+  }
+
+}
+
+async function refreshToken(req, res) {
+  try {
+    const { iat, exp, nbf, ...payload } = req.user;
+    return res.json({
+      success: true,
+      token: signSessionToken(payload)
+    });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: 'Gagal memperbarui sesi.' });
   }
 }
 
@@ -93,5 +112,6 @@ async function getMe(req, res) {
 
 module.exports = {
   login,
+  refreshToken,
   getMe
 };
