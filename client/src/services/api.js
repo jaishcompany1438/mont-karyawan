@@ -13,13 +13,18 @@ function getHeaders(isMultipart = false) {
 }
 
 async function handleResponse(response) {
-  if (response.status === 401) {
+  const data = await response.json().catch(() => ({}));
+  const isExpiredSession = response.status === 401
+    || (response.status === 403 && (
+      data.code === 'AUTHENTICATION_REQUIRED'
+      || String(data.message || '').toLowerCase().includes('sesi tidak valid')
+    ));
+  if (isExpiredSession) {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
     window.dispatchEvent(new Event('auth:unauthorized'));
   }
 
-  const data = await response.json().catch(() => ({}));
   if (!response.ok) {
     throw new Error(data.message || `Request failed with status ${response.status}`);
   }

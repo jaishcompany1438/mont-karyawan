@@ -5,7 +5,7 @@ const { JWT_SECRET } = require('../middleware/auth');
 
 function signSessionToken(payload) {
   return jwt.sign(payload, JWT_SECRET, {
-    expiresIn: process.env.JWT_EXPIRES_IN || '7d'
+    expiresIn: process.env.JWT_EXPIRES_IN || '6d'
   });
 }
 
