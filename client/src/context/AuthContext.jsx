@@ -1,18 +1,26 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { api } from '../services/api';
 
 const AuthContext = createContext(null);
+// Sesi bergulir: token berlaku 6 hari dan diperbarui setiap kali token berumur > 1 jam saat web dikunjungi/dipakai.
+const REFRESH_AFTER_AGE = 60 * 60 * 1000;
+const REFRESH_CHECK_INTERVAL = 5 * 60 * 1000;
 
-function getTokenExpiration(token) {
+function getTokenPayload(token) {
   try {
     const encodedPayload = token.split('.')[1];
     if (!encodedPayload) return null;
     const base64 = encodedPayload.replace(/-/g, '+').replace(/_/g, '/');
-    const payload = JSON.parse(window.atob(base64));
-    return Number.isFinite(payload.exp) ? payload.exp * 1000 : null;
+    return JSON.parse(window.atob(base64));
   } catch {
     return null;
   }
+}
+
+function shouldRefreshToken(token) {
+  const payload = getTokenPayload(token);
+  if (!payload || !Number.isFinite(payload.iat)) return true;
+  return Date.now() - payload.iat * 1000 >= REFRESH_AFTER_AGE;
 }
 
 export function AuthProvider({ children }) {
@@ -26,6 +34,7 @@ export function AuthProvider({ children }) {
   });
   const [token, setToken] = useState(() => localStorage.getItem('token') || null);
   const [loading, setLoading] = useState(true);
+  const refreshInFlight = useRef(null);
 
   useEffect(() => {
     async function checkAuth() {
@@ -54,25 +63,38 @@ export function AuthProvider({ children }) {
   useEffect(() => {
     if (!token) return undefined;
 
-    const expiresAt = getTokenExpiration(token);
-    if (!expiresAt) return undefined;
+    const refreshIfNeeded = async () => {
+      const currentToken = localStorage.getItem('token') || token;
+      if (!shouldRefreshToken(currentToken)) return;
+      if (refreshInFlight.current) return refreshInFlight.current;
 
-    const refreshDelay = Math.max(expiresAt - Date.now() - 60 * 1000, 5000);
-    const refreshTimer = window.setTimeout(async () => {
-      try {
-        const res = await api.refreshToken();
-        if (!res.success || !res.token) {
-          logout();
-          return;
-        }
+      refreshInFlight.current = api.refreshToken().then((res) => {
+        if (!res.success || !res.token) throw new Error('Sesi tidak dapat diperbarui.');
         setToken(res.token);
         localStorage.setItem('token', res.token);
-      } catch {
+      }).catch(() => {
         logout();
-      }
-    }, refreshDelay);
+      }).finally(() => {
+        refreshInFlight.current = null;
+      });
 
-    return () => window.clearTimeout(refreshTimer);
+      return refreshInFlight.current;
+    };
+
+    refreshIfNeeded();
+    const refreshInterval = window.setInterval(refreshIfNeeded, REFRESH_CHECK_INTERVAL);
+    const handleActivity = () => {
+      refreshIfNeeded();
+    };
+
+    window.addEventListener('focus', handleActivity);
+    document.addEventListener('visibilitychange', handleActivity);
+
+    return () => {
+      window.clearInterval(refreshInterval);
+      window.removeEventListener('focus', handleActivity);
+      document.removeEventListener('visibilitychange', handleActivity);
+    };
   }, [token]);
 
   const login = async (email, password) => {
