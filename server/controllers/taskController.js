@@ -504,7 +504,7 @@ async function submitReview(req, res) {
   try {
     const { id } = req.params;
     const { id: userId } = req.user;
-    const { keterangan, kendala, solusi, anggaran_terpakai } = req.body;
+    const { keterangan, kendala, solusi, anggaran_terpakai, pelaksana_id } = req.body;
 
     const db = getPool();
     const [rows] = await db.query('SELECT t.*, b.parent_role FROM tasks t JOIN bidang b ON b.id = t.bidang_id WHERE t.id = ?', [id]);
@@ -512,6 +512,17 @@ async function submitReview(req, res) {
       return res.status(404).json({ success: false, message: 'Tugas tidak ditemukan.' });
     }
     const task = rows[0];
+
+    // Only SUPER_ADMIN may record someone else as the executor of the task.
+    let executor = { id: userId, nama: req.user.nama };
+    const isExecutorOverride = req.user.role === 'SUPER_ADMIN' && pelaksana_id !== undefined && String(pelaksana_id).trim() !== '';
+    if (isExecutorOverride) {
+      const [executorRows] = await db.query('SELECT id, nama FROM users WHERE id = ?', [pelaksana_id]);
+      if (executorRows.length === 0) {
+        return res.status(400).json({ success: false, message: 'Pelaksana tugas tidak ditemukan.' });
+      }
+      executor = executorRows[0];
+    }
     if (anggaran_terpakai === undefined || anggaran_terpakai === null || anggaran_terpakai === '') {
       return res.status(400).json({ success: false, message: 'Anggaran terpakai wajib diisi, termasuk dengan nilai 0.' });
     }
@@ -535,16 +546,16 @@ async function submitReview(req, res) {
 
     await db.query(
       `UPDATE tasks SET status = 'UNDER_REVIEW', anggaran_terpakai = ?, bukti_kerja = COALESCE(?, bukti_kerja),
-       kendala = ?, solusi = ?, completed_by = COALESCE(completed_by, ?), completed_at = COALESCE(completed_at, NOW())
+       kendala = ?, solusi = ?, completed_by = ${isExecutorOverride ? '?' : 'COALESCE(completed_by, ?)'}, completed_at = COALESCE(completed_at, NOW())
        WHERE id = ?`,
-      [spent, bukti_kerja, String(kendala || '').trim() || null, String(solusi || '').trim() || null, req.user.id, id]
+      [spent, bukti_kerja, String(kendala || '').trim() || null, String(solusi || '').trim() || null, executor.id, id]
     );
 
     // Notify task creator
     await createNotification({
       userId: task.created_by,
       judul: `Bukti Kerja Dikirim: ${task.judul}`,
-      pesan: `${req.user.nama} telah mengunggah bukti kerja untuk tugas "${task.judul}". Siap untuk diverifikasi.`,
+      pesan: `${executor.nama} telah mengunggah bukti kerja untuk tugas "${task.judul}". Siap untuk diverifikasi.`,
       tipe: 'REVIEW_PEKERJAAN',
       referenceId: task.id,
       referenceType: 'tasks'

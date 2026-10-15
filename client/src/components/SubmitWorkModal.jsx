@@ -1,9 +1,14 @@
 import React, { useEffect, useState } from 'react';
 import { api } from '../services/api';
+import { useAuth } from '../context/AuthContext';
 import { X, Upload, CheckCircle } from 'lucide-react';
 import SuccessToast from './SuccessToast';
 
 export default function SubmitWorkModal({ isOpen, onClose, onSuccess, task }) {
+  const { user } = useAuth();
+  const isSuperAdmin = user?.role === 'SUPER_ADMIN';
+  const [pelaksanaId, setPelaksanaId] = useState('');
+  const [pelaksanaOptions, setPelaksanaOptions] = useState([]);
   const [keterangan, setKeterangan] = useState('');
   const [file, setFile] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -22,8 +27,18 @@ export default function SubmitWorkModal({ isOpen, onClose, onSuccess, task }) {
       setSolusi('');
       setError('');
       setSuccess('');
+      setPelaksanaId(task?.assigned_to ? String(task.assigned_to) : '');
     }
   }, [isOpen, task?.id]);
+
+  useEffect(() => {
+    if (!isOpen || !isSuperAdmin) return undefined;
+    let cancelled = false;
+    api.getUsers()
+      .then((response) => { if (!cancelled) setPelaksanaOptions(response.data || []); })
+      .catch(() => { if (!cancelled) setError('Gagal memuat daftar pelaksana tugas.'); });
+    return () => { cancelled = true; };
+  }, [isOpen, isSuperAdmin]);
 
   if (!isOpen || !task) return null;
 
@@ -44,6 +59,7 @@ export default function SubmitWorkModal({ isOpen, onClose, onSuccess, task }) {
       formData.append('kendala', kendala.trim());
       formData.append('solusi', solusi.trim());
       formData.append('anggaran_terpakai', anggaranTerpakai);
+      if (isSuperAdmin && pelaksanaId) formData.append('pelaksana_id', pelaksanaId);
 
       await api.submitReview(task.id, formData);
       setSuccess('Bukti kerja berhasil dikirim untuk direview.');
@@ -106,6 +122,26 @@ export default function SubmitWorkModal({ isOpen, onClose, onSuccess, task }) {
               <p className="mt-1 text-[10px] text-slate-500">Isi 0 jika tidak ada realisasi biaya.</p>
             </div>
           </div>
+
+          {isSuperAdmin && (
+            <div>
+              <label className="block font-bold text-slate-700 mb-1">Pelaksana Tugas *</label>
+              <select
+                required
+                value={pelaksanaId}
+                onChange={(e) => setPelaksanaId(e.target.value)}
+                className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm"
+              >
+                <option value="" disabled>Pilih pelaksana tugas</option>
+                {pelaksanaOptions.map((item) => (
+                  <option key={item.id} value={item.id}>
+                    {item.nama}{item.jabatan ? ` · ${item.jabatan}` : ''}{item.nama_bidang ? ` (${item.nama_bidang})` : ''}
+                  </option>
+                ))}
+              </select>
+              <p className="mt-1 text-[10px] text-slate-500">Orang yang tercatat melaksanakan tugas ini. Default: penerima tugas.</p>
+            </div>
+          )}
 
           {/* Bukti File */}
           <div>
