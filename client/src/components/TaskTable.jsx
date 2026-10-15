@@ -84,7 +84,7 @@ export default function TaskTable({
                 const isAssignee = task.assigned_to === user?.id;
                 const canReview = ['SUPER_ADMIN', 'MUDIR', 'WAKIL_MUDIR', 'WADIR_PEND', 'WADIR_PENGS'].includes(role) ||
                                   (role === 'KABID' && task.bidang_id === user?.bidang_id &&
-                                    task.assignee_role === 'STAF' && ['KABID', 'STAF'].includes(task.creator_role));
+                                    task.assignee_role === 'STAF');
                 const canEdit = ['SUPER_ADMIN', 'MUDIR'].includes(role) || (task.created_by === user?.id && role !== 'KABID');
                 const canDelegate = role === 'KABID' &&
                   task.bidang_id === user?.bidang_id &&

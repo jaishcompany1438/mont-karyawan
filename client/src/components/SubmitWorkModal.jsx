@@ -86,6 +86,13 @@ export default function SubmitWorkModal({ isOpen, onClose, onSuccess, task }) {
             </div>
           )}
 
+          {task.status === 'REVISION' && (task.catatan_revisi || task.catatan_reviewer) && (
+            <div className="p-3 bg-orange-50 border border-orange-200 rounded-2xl text-orange-900">
+              <span className="block text-[10px] font-bold uppercase">Catatan Revisi dari Reviewer</span>
+              <p className="mt-1 whitespace-pre-wrap break-words text-xs leading-relaxed">{task.catatan_revisi || task.catatan_reviewer}</p>
+            </div>
+          )}
+
           <div className="p-3 bg-slate-50 border border-slate-200 rounded-2xl">
             <span className="text-[10px] font-bold text-slate-400 uppercase">Tugas Yang Dikerjakan</span>
             <h4 className="text-xs font-bold text-slate-900 mt-0.5">{task.judul}</h4>

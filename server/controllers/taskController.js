@@ -595,7 +595,8 @@ async function reviewTask(req, res) {
     }
     const task = rows[0];
 
-    // A KABID reviews only staff work in their branch. Senior leadership reviews subordinate work.
+    // A KABID reviews work of staff (subordinates) in their own bidang, whoever created the task.
+    // Senior leadership reviews subordinate work.
     const [taskWithBranch] = await db.query('SELECT parent_role FROM bidang WHERE id = ?', [task.bidang_id]);
     task.parent_role = taskWithBranch[0] && taskWithBranch[0].parent_role;
     const canReview =
@@ -603,8 +604,7 @@ async function reviewTask(req, res) {
       ['MUDIR', 'WAKIL_MUDIR'].includes(role) ||
       (role === 'KABID' &&
         task.bidang_id === userBidangId &&
-        task.assignee_role === 'STAF' &&
-        ['KABID', 'STAF'].includes(task.creator_role)) ||
+        task.assignee_role === 'STAF') ||
       ((role === 'WADIR_PEND' || role === 'WADIR_PENGS') && task.parent_role === role);
 
     if (!canReview) {
