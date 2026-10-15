@@ -30,7 +30,7 @@ export default function MobileTaskGroups({ tasks = [], onOpenSubmitWork, onOpenR
   const [expandedTitle, setExpandedTitle] = React.useState(null);
   const canReview = (task) => ['SUPER_ADMIN', 'MUDIR', 'WAKIL_MUDIR', 'WADIR_PEND', 'WADIR_PENGS'].includes(role)
     || (role === 'KABID' && task.bidang_id === user?.bidang_id
-      && task.assignee_role === 'STAF' && ['KABID', 'STAF'].includes(task.creator_role));
+      && task.assignee_role === 'STAF');
 
   return (
     <div className="space-y-3 md:hidden">
@@ -70,6 +70,12 @@ export default function MobileTaskGroups({ tasks = [], onOpenSubmitWork, onOpenR
                       <span className="flex items-center gap-1"><Calendar className="h-3 w-3" />{new Date(task.due_date).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
                       <span>{task.assignee_nama}{task.assignee_sub_bidang ? ` · ${task.assignee_sub_bidang}` : ''}</span>
                     </div>
+                    {task.status === 'REVISION' && (task.catatan_revisi || task.catatan_reviewer) && (
+                      <div className="mt-2 rounded-lg border border-orange-200 bg-orange-50 p-2 text-[11px] leading-relaxed text-orange-900">
+                        <span className="block font-bold">Catatan Revisi:</span>
+                        <span className="whitespace-pre-wrap break-words">{task.catatan_revisi || task.catatan_reviewer}</span>
+                      </div>
+                    )}
                     <div className="mt-2 flex items-center justify-between gap-2">
                       <span className={`text-[10px] font-bold ${group.id === 'overdue' ? 'text-rose-600' : group.id === 'completed' ? 'text-blue-600' : 'text-blue-600'}`}>{statusLabel(task.status)}</span>
                       <div className="flex gap-1.5">
