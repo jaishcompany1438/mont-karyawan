@@ -1,5 +1,6 @@
 const { getPool, isDbConnected } = require('../config/db');
 const { createNotification } = require('./notificationController');
+const { getTodayRange } = require('../utils/dateRange');
 
 function recurringFlag(value, defaultValue) {
   if (value === undefined || value === null || value === '') return defaultValue;
@@ -33,29 +34,76 @@ function parseRating(value, label) {
   return Math.round(rating * 10) / 10;
 }
 
-// GET /api/tasks
+const TASK_LIST_SELECT = `
+  SELECT t.*,
+         creator.nama AS creator_nama, creator.role AS creator_role,
+         assignee.nama AS assignee_nama, assignee.role AS assignee_role, assignee.email AS assignee_email, assignee.no_telepon AS assignee_no_telepon, assignee.jabatan AS assignee_jabatan,
+         assignee.sub_bidang AS assignee_sub_bidang,
+         b.nama_bidang, b.kode_bidang, b.parent_role
+  FROM tasks t
+  JOIN users creator ON t.created_by = creator.id
+  JOIN users assignee ON t.assigned_to = assignee.id
+  JOIN bidang b ON t.bidang_id = b.id
+  WHERE 1=1
+`;
+
+// Clause visibilitas tugas berdasarkan peran (alias tabel: t, b).
+function buildTaskVisibility({ role, bidang_id, id: userId }) {
+  if (role === 'STAF') {
+    return { clause: ' AND t.assigned_to = ?', params: [userId] };
+  }
+  if (role === 'KABID') {
+    return {
+      clause: ' AND (t.bidang_id = ? OR t.created_by = ? OR t.assigned_to = ?)',
+      params: [bidang_id, userId, userId]
+    };
+  }
+  if (role === 'WADIR_PEND' || role === 'WADIR_PENGS') {
+    return {
+      clause: ' AND (b.parent_role = ? OR t.created_by = ? OR t.assigned_to = ?)',
+      params: [role, userId, userId]
+    };
+  }
+  // SUPER_ADMIN, MUDIR dan WAKIL_MUDIR dapat melihat semua tugas.
+  return { clause: '', params: [] };
+}
+
+// GET /api/tasks/today
+// Daftar tugas jatuh tempo hari ini (tanggal sistem) untuk dashboard utama. Terbuka untuk semua peran,
+// tetapi visibilitas tetap dibatasi sesuai peran.
+async function getTodayTasks(req, res) {
+  try {
+    if (!isDbConnected()) {
+      return res.status(503).json({ success: false, message: 'Database belum terhubung.' });
+    }
+
+    const { start, end } = getTodayRange();
+    const visibility = buildTaskVisibility(req.user);
+    const query = `${TASK_LIST_SELECT}
+      AND t.due_date >= ? AND t.due_date < ?${visibility.clause}
+      ORDER BY CASE WHEN t.status = 'COMPLETED' THEN 1 ELSE 0 END ASC,
+               t.due_date ASC,
+               FIELD(t.prioritas, 'URGEN', 'TINGGI', 'SEDANG', 'RENDAH') ASC,
+               t.id ASC`;
+
+    const [rows] = await getPool().query(query, [start, end, ...visibility.params]);
+    return res.json({ success: true, count: rows.length, date: start.slice(0, 10), data: rows });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: 'Gagal mengambil tugas hari ini: ' + error.message });
+  }
+}
+
+// GET /api/tasks (Manajemen Tugas; dibatasi peran di routes)
 async function getTasks(req, res) {
   try {
     if (!isDbConnected()) {
       return res.status(503).json({ success: false, message: 'Database belum terhubung.' });
     }
 
-    const { role, bidang_id, id: userId } = req.user;
     const { periode, status, prioritas, kategori, bidang_id: filterBidangId, assigned_to, search } = req.query;
     const db = getPool();
 
-    let query = `
-      SELECT t.*,
-             creator.nama AS creator_nama, creator.role AS creator_role,
-             assignee.nama AS assignee_nama, assignee.role AS assignee_role, assignee.email AS assignee_email, assignee.no_telepon AS assignee_no_telepon, assignee.jabatan AS assignee_jabatan,
-             assignee.sub_bidang AS assignee_sub_bidang,
-             b.nama_bidang, b.kode_bidang, b.parent_role
-      FROM tasks t
-      JOIN users creator ON t.created_by = creator.id
-      JOIN users assignee ON t.assigned_to = assignee.id
-      JOIN bidang b ON t.bidang_id = b.id
-      WHERE 1=1
-    `;
+    let query = TASK_LIST_SELECT;
     const params = [];
 
     // Keep the task-management view focused: current month plus the previous month.
@@ -70,22 +118,9 @@ async function getTasks(req, res) {
     query += ' AND t.due_date >= ? AND t.due_date < ?';
     params.push(toSqlDateTime(displayStart), toSqlDateTime(displayEnd));
 
-    // RBAC filtering on visibility
-    if (role === 'STAF') {
-      // Staf only sees tasks assigned to them
-      query += ' AND t.assigned_to = ?';
-      params.push(userId);
-    } else if (role === 'KABID') {
-      // Kabid sees tasks in their bidang OR created by them OR assigned to them
-      query += ' AND (t.bidang_id = ? OR t.created_by = ? OR t.assigned_to = ?)';
-      params.push(bidang_id, userId, userId);
-    } else if (role === 'WADIR_PEND' || role === 'WADIR_PENGS') {
-      query += ' AND (b.parent_role = ? OR t.created_by = ? OR t.assigned_to = ?)';
-      params.push(role, userId, userId);
-    } else if (role === 'WAKIL_MUDIR') {
-      // Wakil Mudir may monitor tasks across subordinate roles.
-    }
-    // SUPER_ADMIN, MUDIR and legacy WAKIL_MUDIR can view all tasks.
+    const visibility = buildTaskVisibility(req.user);
+    query += visibility.clause;
+    params.push(...visibility.params);
 
     // Period filter (PRD 3.2: HARIAN, PEKANAN, BULANAN, TAHUNAN, INSIDENTAL)
     if (periode && ['HARIAN', 'PEKANAN', 'BULANAN', 'TAHUNAN', 'INSIDENTAL'].includes(periode.toUpperCase())) {
@@ -712,6 +747,8 @@ async function deleteTasks(req, res) {
 
 module.exports = {
   getTasks,
+  getTodayTasks,
+  buildTaskVisibility,
   getTaskById,
   createTask,
   updateTask,

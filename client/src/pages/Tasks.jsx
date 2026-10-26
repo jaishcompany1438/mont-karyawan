@@ -7,6 +7,8 @@ import TaskTable from '../components/TaskTable';
 import ReviewModal from '../components/ReviewModal';
 import MobileTaskGroups from '../components/MobileTaskGroups';
 import DelegateTaskModal from '../components/DelegateTaskModal';
+import StatCards from '../components/StatCards';
+import DepartmentSummary from '../components/DepartmentSummary';
 import { LayoutGrid, List, Search } from 'lucide-react';
 
 const MOBILE_STATUS_FILTERS = [
@@ -36,6 +38,26 @@ export default function Tasks({ refreshKey, onRefresh, onOpenCreateTask, onOpenE
   const [bidang, setBidang] = useState([]);
   const [selectedIds, setSelectedIds] = useState([]);
   const [delegateTask, setDelegateTask] = useState(null);
+  const [summary, setSummary] = useState({ stats: {}, byPeriod: [], departmentSummary: [] });
+
+  useEffect(() => {
+    let cancelled = false;
+    api.getDashboardStats(period ? { periode: period } : {}).then((result) => {
+      if (!cancelled) setSummary(result);
+    }).catch((err) => {
+      if (!cancelled) setError(err.message);
+    });
+    return () => { cancelled = true; };
+  }, [period, refreshKey]);
+
+  const periodCounts = (summary.byPeriod || []).reduce(
+    (acc, item) => ({ ...acc, [item.periode]: item.total }),
+    { total: summary.stats?.total || 0 }
+  );
+  const handleStatCardClick = (cardId) => {
+    if (cardId === 'OVERDUE') return;
+    setStatus(cardId === 'ALL' ? '' : cardId);
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -65,8 +87,15 @@ export default function Tasks({ refreshKey, onRefresh, onOpenCreateTask, onOpenE
     <div className="space-y-5">
       <div className="flex flex-wrap items-end justify-between gap-3"><div><p className="text-xs font-semibold uppercase tracking-wider text-blue-700">Pelacakan pekerjaan</p><h2 className="mt-1 text-2xl font-extrabold text-slate-900">Manajemen Tugas</h2><p className="mt-1 text-xs font-medium text-slate-500">Menampilkan tugas bulan ini dan satu bulan sebelumnya</p>{bidangId && <p className="mt-1 text-xs font-semibold text-slate-500">Filter bidang aktif</p>}</div><button onClick={onOpenCreateTask} className="rounded-xl bg-blue-700 px-4 py-2.5 text-xs font-bold text-white hover:bg-blue-600">+ Buat Tugas</button></div>
       {error && <div className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs text-rose-700">{error}</div>}
-      <PeriodTabs selectedPeriod={period} onChange={setPeriod} />
-      <div className="flex flex-wrap items-center justify-between gap-3"><label className="flex min-w-[220px] flex-1 items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-400"><Search className="h-4 w-4" /><input className="w-full outline-none" placeholder="Cari judul, deskripsi, atau penerima..." value={search} onChange={(e) => setSearch(e.target.value)} /></label><div className="flex gap-2"><button onClick={() => setFiltersOpen((value) => !value)} className={`rounded-xl border px-3 py-2 text-xs font-bold ${filtersOpen ? 'border-blue-300 bg-blue-50 text-blue-700' : 'border-slate-200 bg-white text-slate-600'}`}>Filter Detail</button><div className="flex rounded-xl border border-slate-200 bg-white p-1"><button onClick={() => setView('kanban')} className={`rounded-lg p-2 ${view === 'kanban' ? 'bg-blue-100 text-blue-700' : 'text-slate-500'}`}><LayoutGrid className="h-4 w-4" /></button><button onClick={() => setView('table')} className={`rounded-lg p-2 ${view === 'table' ? 'bg-blue-100 text-blue-700' : 'text-slate-500'}`}><List className="h-4 w-4" /></button></div></div></div>
+      <PeriodTabs selectedPeriod={period} onChange={setPeriod} counts={periodCounts} />
+      <StatCards stats={summary.stats} activeFilter={status || 'ALL'} onCardClick={handleStatCardClick} />
+      {summary.departmentSummary?.length > 0 && (
+        <DepartmentSummary
+          items={summary.departmentSummary}
+          activeBidangId={bidangId}
+          onSelect={(id) => setBidangId(String(bidangId) === String(id) ? '' : id)}
+        />
+      )}      <div className="flex flex-wrap items-center justify-between gap-3"><label className="flex min-w-[220px] flex-1 items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-400"><Search className="h-4 w-4" /><input className="w-full outline-none" placeholder="Cari judul, deskripsi, atau penerima..." value={search} onChange={(e) => setSearch(e.target.value)} /></label><div className="flex gap-2"><button onClick={() => setFiltersOpen((value) => !value)} className={`rounded-xl border px-3 py-2 text-xs font-bold ${filtersOpen ? 'border-blue-300 bg-blue-50 text-blue-700' : 'border-slate-200 bg-white text-slate-600'}`}>Filter Detail</button><div className="flex rounded-xl border border-slate-200 bg-white p-1"><button onClick={() => setView('kanban')} className={`rounded-lg p-2 ${view === 'kanban' ? 'bg-blue-100 text-blue-700' : 'text-slate-500'}`}><LayoutGrid className="h-4 w-4" /></button><button onClick={() => setView('table')} className={`rounded-lg p-2 ${view === 'table' ? 'bg-blue-100 text-blue-700' : 'text-slate-500'}`}><List className="h-4 w-4" /></button></div></div></div>
       <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1 md:hidden" aria-label="Filter status tugas">
         {MOBILE_STATUS_FILTERS.map(([value, label]) => (
           <button
