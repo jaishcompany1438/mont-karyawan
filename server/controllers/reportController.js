@@ -143,10 +143,26 @@ async function getDashboardStats(req, res) {
   }
 }
 
+function getReportBranchRole(user) {
+  const branchRoles = ['WADIR_PEND', 'WADIR_PENGS'];
+  if (branchRoles.includes(user?.role)) return user.role;
+  if (user?.role === 'WAKIL_MUDIR' && branchRoles.includes(user.parent_role)) return user.parent_role;
+  return null;
+}
+
 async function getReportRows(req) {
     const { role, bidang_id, id: userId } = req.user;
-    const { periode, status, bidang_id: filterBidangId, start_date: startDate, end_date: endDate, own_tasks: ownTasks } = req.query;
+    const {
+      periode,
+      status,
+      bidang_id: filterBidangId,
+      start_date: startDate,
+      end_date: endDate,
+      own_tasks: ownTasks,
+      scope
+    } = req.query;
     const db = getPool();
+    const branchRole = getReportBranchRole(req.user);
 
     let query = `
       SELECT t.*,
@@ -175,10 +191,13 @@ async function getReportRows(req) {
     } else if (role === 'KABID') {
       query += ' AND (t.bidang_id = ? OR t.created_by = ? OR t.assigned_to = ?)';
       params.push(bidang_id, userId, userId);
-    } else if (['WADIR_PEND', 'WADIR_PENGS'].includes(role) && ownTasks !== '1') {
+    } else if (branchRole && scope === 'coordinated') {
+      query += ' AND b.parent_role = ?';
+      params.push(branchRole);
+    } else if (branchRole && ownTasks !== '1' && scope !== 'own') {
       query += ' AND (b.parent_role = ? OR t.created_by = ? OR t.assigned_to = ?)';
-      params.push(role, userId, userId);
-    } else if (['WADIR_PEND', 'WADIR_PENGS', 'WAKIL_MUDIR'].includes(role)) {
+      params.push(branchRole, userId, userId);
+    } else if (branchRole || role === 'WAKIL_MUDIR') {
       // Wakil Mudir may export only tasks created by or assigned to their own account.
       query += ' AND (t.created_by = ? OR t.assigned_to = ?)';
       params.push(userId, userId);
@@ -211,7 +230,47 @@ async function getReportRows(req) {
     query += ' ORDER BY t.periode ASC, t.due_date ASC';
 
     const [rows] = await db.query(query, params);
+    const executorsByTask = new Map();
+    for (let offset = 0; offset < rows.length; offset += 500) {
+      const taskIds = rows.slice(offset, offset + 500).map((row) => row.id);
+      const placeholders = taskIds.map(() => '?').join(', ');
+      const [executorRows] = await db.query(
+        `SELECT te.task_id, u.nama
+         FROM task_executors te
+         JOIN users u ON u.id = te.user_id
+         WHERE te.task_id IN (${placeholders})
+         ORDER BY te.task_id, u.nama`,
+        taskIds
+      );
+      for (const executor of executorRows) {
+        const key = String(executor.task_id);
+        if (!executorsByTask.has(key)) executorsByTask.set(key, []);
+        executorsByTask.get(key).push(executor.nama);
+      }
+    }
+    for (const row of rows) {
+      row.pelaksana_names = executorsByTask.get(String(row.id)) || [];
+    }
     return rows;
+}
+
+function authorizeReportScope(req, res, next) {
+  const { scope } = req.query;
+  const role = req.user?.role;
+  const branchRole = getReportBranchRole(req.user);
+  const canExportOwnTasks = Boolean(branchRole) || role === 'WAKIL_MUDIR';
+
+  if (scope && !['own', 'coordinated'].includes(scope)) {
+    return res.status(400).json({ success: false, message: 'Ruang lingkup laporan tidak valid.' });
+  }
+  if (scope === 'coordinated' && !branchRole) {
+    return res.status(403).json({ success: false, message: 'Laporan bidang koordinasi hanya tersedia untuk WADIR.' });
+  }
+  if (scope === 'own' && !canExportOwnTasks) {
+    return res.status(403).json({ success: false, message: 'Ruang lingkup laporan ini tidak tersedia untuk peran Anda.' });
+  }
+
+  return next();
 }
 
 // GET /api/reports/export/excel
@@ -300,7 +359,10 @@ function formatKendalaSolusi(kendala, solusi) {
 function formatPelaksana(row) {
   const assignee = row.assignee_nama || '-';
   const started = row.started_by_nama ? `Mulai: ${row.started_by_nama}` : '';
-  const completed = row.completed_by_nama ? `Selesai: ${row.completed_by_nama}` : '';
+  const selectedExecutors = Array.isArray(row.pelaksana_names) ? row.pelaksana_names : [];
+  const completed = selectedExecutors.length
+    ? `Pelaksana: ${selectedExecutors.join(', ')}`
+    : (row.completed_by_nama ? `Pelaksana: ${row.completed_by_nama}` : '');
   return [assignee, started, completed].filter(Boolean).join('\n');
 }
 
@@ -367,8 +429,8 @@ function aggregateReportRows(rows, filters = {}) {
         reviewerNotes: [],
         kendalaNotes: [],
         solusiNotes: [],
-        ratings: []
-        , executors: []
+        ratings: [],
+        executors: []
       };
     }
     const group = result[key];
@@ -384,7 +446,10 @@ function aggregateReportRows(rows, filters = {}) {
     const solusi = String(row.solusi || '').trim();
     if (kendala) group.kendalaNotes.push(kendala);
     if (solusi) group.solusiNotes.push(solusi);
-    [row.assignee_nama, row.started_by_nama, row.completed_by_nama].filter(Boolean).forEach((name) => group.executors.push(name));
+    const selectedExecutors = Array.isArray(row.pelaksana_names) ? row.pelaksana_names : [];
+    [...selectedExecutors, row.assignee_nama, row.started_by_nama, row.completed_by_nama]
+      .filter(Boolean)
+      .forEach((name) => group.executors.push(name));
     [row.nilai_sop, row.nilai_waktu, row.nilai_kualitas].forEach((value) => {
       if (value !== null && value !== undefined && value !== '') group.ratings.push(Number(value));
     });
@@ -405,7 +470,7 @@ function aggregateReportRows(rows, filters = {}) {
         [...new Set(group.kendalaNotes)].slice(-3).join('\n- '),
         [...new Set(group.solusiNotes)].slice(-3).join('\n- ')
       ),
-      pelaksana: [...new Set(group.executors)].slice(-3).join('\n') || '-',
+      pelaksana: [...new Set(group.executors)].join('\n') || '-',
       penilaian: group.ratings.length
         ? (group.ratings.reduce((sum, value) => sum + value, 0) / group.ratings.length).toFixed(1)
         : '-'
@@ -655,6 +720,8 @@ async function exportPdfReport(req, res) {
 
 module.exports = {
   getDashboardStats,
+  getReportRows,
+  authorizeReportScope,
   exportExcelReport,
   exportPdfReport,
   aggregateReportRows

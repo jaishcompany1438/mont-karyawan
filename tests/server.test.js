@@ -18,7 +18,17 @@ require.cache[dbPath] = {
       query: async (sql, params = []) => {
         queryLog.push({ sql, params });
         return [queryHandler(sql, params)];
-      }
+      },
+      getConnection: async () => ({
+        beginTransaction: async () => queryLog.push({ sql: 'BEGIN TRANSACTION', params: [] }),
+        query: async (sql, params = []) => {
+          queryLog.push({ sql, params });
+          return [queryHandler(sql, params)];
+        },
+        commit: async () => queryLog.push({ sql: 'COMMIT', params: [] }),
+        rollback: async () => queryLog.push({ sql: 'ROLLBACK', params: [] }),
+        release: () => queryLog.push({ sql: 'RELEASE', params: [] })
+      })
     })
   }
 };
@@ -26,6 +36,8 @@ require.cache[dbPath] = {
 const { app } = require('../server/index');
 const { JWT_SECRET } = require('../server/middleware/auth');
 const { getTodayRange } = require('../server/utils/dateRange');
+const { aggregateReportRows, getReportRows } = require('../server/controllers/reportController');
+const { parseExecutorIds } = require('../server/controllers/taskController');
 
 let server;
 let baseUrl;
@@ -52,9 +64,11 @@ const users = {
 
 function request(path, role, options = {}) {
   const token = jwt.sign(users[role], JWT_SECRET, { expiresIn: '1h' });
+  const headers = { Authorization: `Bearer ${token}`, ...options.headers };
+  if (!(options.body instanceof FormData)) headers['Content-Type'] = 'application/json';
   return fetch(`${baseUrl}${path}`, {
     ...options,
-    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json', ...options.headers }
+    headers
   });
 }
 
@@ -150,4 +164,235 @@ test('Staf tidak bisa memulai tugas milik orang lain', async () => {
 
   assert.equal(response.status, 403);
   assert.equal(queryLog.some((entry) => entry.sql.includes('UPDATE tasks')), false);
+});
+
+test('WADIR_PEND dapat mengekspor hanya tugas bidang di bawah koordinasinya', async () => {
+  await getReportRows({
+    user: users.WADIR_PEND,
+    query: { scope: 'coordinated', bidang_id: '8' }
+  });
+
+  assert.match(queryLog[0].sql, /AND b\.parent_role = \?/);
+  assert.match(queryLog[0].sql, /AND t\.bidang_id = \?/);
+  assert.deepEqual(queryLog[0].params, ['WADIR_PEND', '8']);
+});
+
+test('WADIR_PENGS hanya dapat mengekspor bidang di cabangnya sendiri', async () => {
+  await getReportRows({
+    user: { ...users.WADIR_PEND, role: 'WADIR_PENGS' },
+    query: { scope: 'coordinated' }
+  });
+
+  assert.match(queryLog[0].sql, /AND b\.parent_role = \?/);
+  assert.deepEqual(queryLog[0].params, ['WADIR_PENGS']);
+});
+
+test('WAKIL_MUDIR dengan cabang koordinasi dapat mengekspor tugas di cabang tersebut', async () => {
+  await getReportRows({
+    user: { ...users.WAKIL_MUDIR, parent_role: 'WADIR_PEND' },
+    query: { scope: 'coordinated' }
+  });
+
+  assert.match(queryLog[0].sql, /AND b\.parent_role = \?/);
+  assert.deepEqual(queryLog[0].params, ['WADIR_PEND']);
+});
+
+test('Ekspor tugas pribadi WADIR tetap hanya mencakup tugas yang dibuat atau ditugaskan kepadanya', async () => {
+  await getReportRows({
+    user: users.WADIR_PEND,
+    query: { scope: 'own', own_tasks: '1' }
+  });
+
+  assert.match(queryLog[0].sql, /AND \(t\.created_by = \? OR t\.assigned_to = \?\)/);
+  assert.doesNotMatch(queryLog[0].sql, /b\.parent_role = \?/);
+  assert.deepEqual(queryLog[0].params, [users.WADIR_PEND.id, users.WADIR_PEND.id]);
+});
+
+test('getReportRows memuat seluruh nama pelaksana yang terkait dengan tugas', async () => {
+  queryHandler = (sql) => {
+    if (sql.includes('FROM tasks t')) return [{ id: 7, judul: 'Tugas laporan' }];
+    if (sql.includes('FROM task_executors te')) {
+      return [
+        { task_id: 7, nama: 'Pelaksana Satu' },
+        { task_id: 7, nama: 'Pelaksana Dua' }
+      ];
+    }
+    return [];
+  };
+
+  const rows = await getReportRows({ user: users.MUDIR, query: {} });
+
+  assert.deepEqual(rows[0].pelaksana_names, ['Pelaksana Satu', 'Pelaksana Dua']);
+  assert.match(queryLog[1].sql, /FROM task_executors te/);
+});
+
+test('Wakil Mudir umum tidak dapat meminta ekspor laporan bidang koordinasi', async () => {
+  const response = await request('/api/reports/export/excel?scope=coordinated', 'WAKIL_MUDIR');
+
+  assert.equal(response.status, 403);
+  assert.equal(queryLog.length, 0);
+});
+
+test('WAKIL_MUDIR tanpa cabang koordinasi ditolak untuk ekspor bidang koordinasi', async () => {
+  const token = jwt.sign({ ...users.WAKIL_MUDIR, parent_role: null }, JWT_SECRET, { expiresIn: '1h' });
+  const response = await fetch(`${baseUrl}/api/reports/export/excel?scope=coordinated`, {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+
+  assert.equal(response.status, 403);
+  assert.equal(queryLog.length, 0);
+});
+
+test('parseExecutorIds menerima beberapa pengguna dan menghapus ID duplikat', () => {
+  assert.deepEqual(parseExecutorIds(['11', 12, '11']), [11, 12]);
+});
+
+test('parseExecutorIds menolak daftar kosong dan ID yang tidak valid', () => {
+  assert.throws(() => parseExecutorIds([]), /Pilih setidaknya satu pelaksana/);
+  assert.throws(() => parseExecutorIds(['12x']), /Pilihan pelaksana tugas tidak valid/);
+  assert.throws(() => parseExecutorIds(['0']), /Pilihan pelaksana tugas tidak valid/);
+});
+
+test('Super Admin dapat menyimpan beberapa pelaksana saat mengirim hasil tugas', async () => {
+  queryHandler = (sql, params = []) => {
+    if (sql.startsWith('SELECT t.*, b.parent_role')) {
+      return [{
+        id: 7,
+        judul: 'Tugas uji',
+        created_by: 88,
+        assigned_to: 99,
+        anggaran_dana: 100,
+        bukti_kerja: '/uploads/bukti-lama.pdf'
+      }];
+    }
+    if (sql.startsWith('SELECT id, nama FROM users WHERE id IN')) {
+      return params.map((id) => ({ id: Number(id), nama: `Pengguna ${id}` }));
+    }
+    return [];
+  };
+  const form = new FormData();
+  form.append('anggaran_terpakai', '0');
+  form.append('pelaksana_ids', '11');
+  form.append('pelaksana_ids', '12');
+
+  const response = await request('/api/tasks/7/submit-review', 'SUPER_ADMIN', {
+    method: 'POST',
+    body: form
+  });
+  const body = await response.json();
+
+  assert.equal(response.status, 200);
+  assert.equal(body.success, true);
+  assert.deepEqual(queryLog.find((entry) => entry.sql.startsWith('SELECT id, nama FROM users WHERE id IN')).params, [11, 12]);
+  const associationInsert = queryLog.find((entry) => entry.sql.startsWith('INSERT INTO task_executors'));
+  assert.ok(associationInsert);
+  assert.deepEqual(associationInsert.params, ['7', 11, '7', 12]);
+  const taskUpdate = queryLog.find((entry) => entry.sql.startsWith('UPDATE tasks SET status'));
+  assert.equal(taskUpdate.params[4], 11);
+  assert.ok(queryLog.some((entry) => entry.sql === 'COMMIT'));
+});
+
+test('Super Admin dapat mengubah daftar pelaksana saat menyetujui tugas', async () => {
+  queryHandler = (sql, params = []) => {
+    if (sql.startsWith('SELECT t.*, creator.role AS creator_role')) {
+      return [{
+        id: 7,
+        judul: 'Tugas uji',
+        created_by: 88,
+        assigned_to: 99,
+        bidang_id: 1,
+        status: 'UNDER_REVIEW',
+        completed_by: 99,
+        assignee_role: 'STAF'
+      }];
+    }
+    if (sql.startsWith('SELECT parent_role FROM bidang')) return [{ parent_role: null }];
+    if (sql.startsWith('SELECT id, nama FROM users WHERE id IN')) {
+      return params.map((id) => ({ id: Number(id), nama: `Pengguna ${id}` }));
+    }
+    return [];
+  };
+
+  const response = await request('/api/tasks/7/review', 'SUPER_ADMIN', {
+    method: 'POST',
+    body: JSON.stringify({
+      action: 'APPROVE',
+      nilai_sop: 4,
+      nilai_waktu: 4,
+      nilai_kualitas: 5,
+      pelaksana_ids: [11, 12]
+    })
+  });
+  const body = await response.json();
+
+  assert.equal(response.status, 200);
+  assert.equal(body.success, true);
+  const associationInsert = queryLog.find((entry) => entry.sql.startsWith('INSERT INTO task_executors'));
+  assert.ok(associationInsert);
+  assert.deepEqual(associationInsert.params, ['7', 11, '7', 12]);
+  const taskUpdate = queryLog.find((entry) => entry.sql.startsWith('UPDATE tasks SET status'));
+  assert.equal(taskUpdate.params[7], 11);
+  assert.ok(queryLog.some((entry) => entry.sql === 'COMMIT'));
+});
+
+test('pengguna selain Super Admin tidak dapat menentukan pelaksana', async () => {
+  queryHandler = (sql) => (sql.startsWith('SELECT t.*, b.parent_role') ? [{
+    id: 7,
+    judul: 'Tugas uji',
+    created_by: 88,
+    assigned_to: users.KABID.id,
+    anggaran_dana: 100,
+    bukti_kerja: '/uploads/bukti-lama.pdf'
+  }] : []);
+  const response = await request('/api/tasks/7/submit-review', 'KABID', {
+    method: 'POST',
+    body: JSON.stringify({ anggaran_terpakai: 0, pelaksana_ids: [12] })
+  });
+
+  assert.equal(response.status, 403);
+  assert.equal(queryLog.some((entry) => entry.sql === 'BEGIN TRANSACTION'), false);
+});
+
+test('reviewer selain Super Admin tidak dapat mengubah pelaksana', async () => {
+  queryHandler = (sql) => {
+    if (sql.startsWith('SELECT t.*, creator.role AS creator_role')) {
+      return [{
+        id: 7,
+        judul: 'Tugas uji',
+        created_by: 88,
+        assigned_to: 99,
+        bidang_id: 1,
+        status: 'UNDER_REVIEW',
+        assignee_role: 'STAF'
+      }];
+    }
+    if (sql.startsWith('SELECT parent_role FROM bidang')) return [{ parent_role: null }];
+    return [];
+  };
+  const response = await request('/api/tasks/7/review', 'MUDIR', {
+    method: 'POST',
+    body: JSON.stringify({
+      action: 'APPROVE',
+      nilai_sop: 4,
+      nilai_waktu: 4,
+      nilai_kualitas: 5,
+      pelaksana_ids: [12]
+    })
+  });
+
+  assert.equal(response.status, 403);
+  assert.equal(queryLog.some((entry) => entry.sql === 'BEGIN TRANSACTION'), false);
+});
+
+test('agregasi laporan mencantumkan seluruh pelaksana pilihan Super Admin', () => {
+  const [row] = aggregateReportRows([{
+    judul: 'Tugas multi pelaksana',
+    periode: 'INSIDENTAL',
+    kategori: 'MENDADAK',
+    status: 'COMPLETED',
+    pelaksana_names: ['Pengguna 11', 'Pengguna 12'],
+    assignee_nama: 'Pengguna 11'
+  }]);
+
+  assert.equal(row.pelaksana, 'Pengguna 11\nPengguna 12');
 });

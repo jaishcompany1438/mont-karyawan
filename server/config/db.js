@@ -116,6 +116,17 @@ async function initDB() {
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
     `);
 
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS task_executors (
+        task_id INT NOT NULL,
+        user_id INT NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        PRIMARY KEY (task_id, user_id),
+        FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE CASCADE,
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    `);
+
     // 4. Tabel Pengajuan Tugas Lintas Bidang
     await db.query(`
       CREATE TABLE IF NOT EXISTS cross_department_requests (
@@ -195,6 +206,13 @@ async function initDB() {
       );
       if (!columns[0].present) await db.query(statement);
     }
+    await db.query(`
+      INSERT IGNORE INTO task_executors (task_id, user_id)
+      SELECT id, completed_by
+      FROM tasks
+      WHERE completed_by IS NOT NULL
+        AND EXISTS (SELECT 1 FROM users WHERE users.id = tasks.completed_by)
+    `);
 
     await db.query(`
       CREATE TABLE IF NOT EXISTS patroli_ruangan (

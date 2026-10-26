@@ -3,12 +3,14 @@ import { api } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { X, Upload, CheckCircle } from 'lucide-react';
 import SuccessToast from './SuccessToast';
+import ExecutorPicker from './ExecutorPicker';
 
 export default function SubmitWorkModal({ isOpen, onClose, onSuccess, task }) {
   const { user } = useAuth();
   const isSuperAdmin = user?.role === 'SUPER_ADMIN';
-  const [pelaksanaId, setPelaksanaId] = useState('');
+  const [pelaksanaIds, setPelaksanaIds] = useState([]);
   const [pelaksanaOptions, setPelaksanaOptions] = useState([]);
+  const [loadingPelaksana, setLoadingPelaksana] = useState(false);
   const [keterangan, setKeterangan] = useState('');
   const [file, setFile] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -27,16 +29,18 @@ export default function SubmitWorkModal({ isOpen, onClose, onSuccess, task }) {
       setSolusi('');
       setError('');
       setSuccess('');
-      setPelaksanaId(task?.assigned_to ? String(task.assigned_to) : '');
+      setPelaksanaIds(task?.assigned_to ? [String(task.assigned_to)] : []);
     }
   }, [isOpen, task?.id]);
 
   useEffect(() => {
     if (!isOpen || !isSuperAdmin) return undefined;
     let cancelled = false;
+    setLoadingPelaksana(true);
     api.getUsers()
       .then((response) => { if (!cancelled) setPelaksanaOptions(response.data || []); })
-      .catch(() => { if (!cancelled) setError('Gagal memuat daftar pelaksana tugas.'); });
+      .catch(() => { if (!cancelled) setError('Gagal memuat daftar pelaksana tugas.'); })
+      .finally(() => { if (!cancelled) setLoadingPelaksana(false); });
     return () => { cancelled = true; };
   }, [isOpen, isSuperAdmin]);
 
@@ -46,6 +50,10 @@ export default function SubmitWorkModal({ isOpen, onClose, onSuccess, task }) {
     e.preventDefault();
     if (!file && !keterangan.trim()) {
       setError('Wajib mengunggah berkas bukti kerja atau menyertakan keterangan hasil pekerjaan.');
+      return;
+    }
+    if (isSuperAdmin && !pelaksanaIds.length) {
+      setError('Pilih setidaknya satu pelaksana tugas.');
       return;
     }
 
@@ -59,7 +67,9 @@ export default function SubmitWorkModal({ isOpen, onClose, onSuccess, task }) {
       formData.append('kendala', kendala.trim());
       formData.append('solusi', solusi.trim());
       formData.append('anggaran_terpakai', anggaranTerpakai);
-      if (isSuperAdmin && pelaksanaId) formData.append('pelaksana_id', pelaksanaId);
+      if (isSuperAdmin) {
+        pelaksanaIds.forEach((pelaksanaId) => formData.append('pelaksana_ids', pelaksanaId));
+      }
 
       await api.submitReview(task.id, formData);
       setSuccess('Bukti kerja berhasil dikirim untuk direview.');
@@ -124,23 +134,15 @@ export default function SubmitWorkModal({ isOpen, onClose, onSuccess, task }) {
           </div>
 
           {isSuperAdmin && (
-            <div>
-              <label className="block font-bold text-slate-700 mb-1">Pelaksana Tugas *</label>
-              <select
-                required
-                value={pelaksanaId}
-                onChange={(e) => setPelaksanaId(e.target.value)}
-                className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm"
-              >
-                <option value="" disabled>Pilih pelaksana tugas</option>
-                {pelaksanaOptions.map((item) => (
-                  <option key={item.id} value={item.id}>
-                    {item.nama}{item.jabatan ? ` · ${item.jabatan}` : ''}{item.nama_bidang ? ` (${item.nama_bidang})` : ''}
-                  </option>
-                ))}
-              </select>
-              <p className="mt-1 text-[10px] text-slate-500">Orang yang tercatat melaksanakan tugas ini. Default: penerima tugas.</p>
-            </div>
+            <ExecutorPicker
+              options={pelaksanaOptions}
+              selectedIds={pelaksanaIds}
+              loading={loadingPelaksana}
+              helpText="Pilih satu atau beberapa pelaksana. Penerima tugas dipilih secara default."
+              onChange={(id, checked) => setPelaksanaIds((current) => checked
+                ? [...new Set([...current, id])]
+                : current.filter((selectedId) => selectedId !== id))}
+            />
           )}
 
           {/* Bukti File */}
