@@ -71,6 +71,13 @@ export const api = {
     return handleResponse(res);
   },
 
+  async getTodayTasks() {
+    const res = await fetch(`${BASE_URL}/tasks/today`, {
+      headers: getHeaders()
+    });
+    return handleResponse(res);
+  },
+
   async getTaskById(id) {
     const res = await fetch(`${BASE_URL}/tasks/${id}`, {
       headers: getHeaders()

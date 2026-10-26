@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const {
   getTasks,
+  getTodayTasks,
   getTaskById,
   createTask,
   updateTask,
@@ -12,12 +13,16 @@ const {
   deleteTask,
   deleteTasks
 } = require('../controllers/taskController');
-const { authenticateToken } = require('../middleware/auth');
+const { authenticateToken, authorizeRoles } = require('../middleware/auth');
+const { TASK_MANAGEMENT_ROLES } = require('../constants/roles');
 const upload = require('../middleware/upload');
 
 router.use(authenticateToken);
 
-router.get('/', getTasks);
+// Dashboard utama: semua peran, hanya tugas hari ini. Harus berada sebelum '/:id'.
+router.get('/today', getTodayTasks);
+// Manajemen Tugas: hanya KABID, Wakil Mudir, Mudir dan Super Admin.
+router.get('/', authorizeRoles(...TASK_MANAGEMENT_ROLES), getTasks);
 router.get('/:id', getTaskById);
 router.post('/', upload.single('attachment'), createTask);
 router.put('/:id', upload.single('attachment'), updateTask);

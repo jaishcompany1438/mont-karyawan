@@ -1,5 +1,6 @@
 import React from 'react';
 import { useAuth } from '../context/AuthContext';
+import { canAccessTab } from '../utils/access';
 import {
   LayoutDashboard,
   CheckSquare,
@@ -26,30 +27,18 @@ export default function Sidebar({
   const role = user?.role;
 
   const canCreateTask = ['SUPER_ADMIN', 'MUDIR', 'WADIR_PEND', 'WADIR_PENGS', 'KABID'].includes(role);
-  const canManageBidang = ['SUPER_ADMIN', 'MUDIR'].includes(role);
-  const canManageUsers = ['SUPER_ADMIN', 'MUDIR'].includes(role);
   // Setiap bidang bisa mengakses kecuali bawahan bidang (STAF)
-  const canAccessCrossDept = role && role !== 'STAF';
-  const canAccessPatrol = role === 'SUPER_ADMIN' || Boolean(user?.can_patroli) || ['MUDIR', 'WAKIL_MUDIR', 'WADIR_PEND', 'WADIR_PENGS', 'KABID'].includes(role);
+  const canAccessCrossDept = canAccessTab('cross-requests', user);
 
   const navItems = [
     { id: 'dashboard', label: 'Dashboard Utama', icon: LayoutDashboard },
     { id: 'tasks', label: 'Manajemen Tugas', icon: CheckSquare },
     { id: 'reports', label: 'Laporan & Rekap', icon: FileSpreadsheet },
-  ];
-  if (canAccessPatrol) navItems.push({ id: 'patrol', label: 'Patroli Fasilitas', icon: ClipboardCheck });
-
-  if (canAccessCrossDept) {
-    navItems.push({ id: 'cross-requests', label: 'Tugas Lintas Bidang', icon: ArrowRightLeft });
-  }
-
-  if (canManageBidang) {
-    navItems.push({ id: 'departments', label: 'Struktur Bidang', icon: Building });
-  }
-
-  if (canManageUsers) {
-    navItems.push({ id: 'users', label: 'Data Pengguna', icon: Users });
-  }
+    { id: 'patrol', label: 'Patroli Fasilitas', icon: ClipboardCheck },
+    { id: 'cross-requests', label: 'Tugas Lintas Bidang', icon: ArrowRightLeft },
+    { id: 'departments', label: 'Struktur Bidang', icon: Building },
+    { id: 'users', label: 'Data Pengguna', icon: Users },
+  ].filter((item) => canAccessTab(item.id, user));
 
   const handleSelect = (id) => {
     setActiveTab(id);

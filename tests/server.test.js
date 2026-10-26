@@ -1,0 +1,153 @@
+const test = require('node:test');
+const assert = require('node:assert/strict');
+const jwt = require('jsonwebtoken');
+
+// Ganti modul database dengan pool palsu sebelum aplikasi dimuat.
+const dbPath = require.resolve('../server/config/db');
+const queryLog = [];
+let queryHandler = () => [];
+require.cache[dbPath] = {
+  id: dbPath,
+  filename: dbPath,
+  loaded: true,
+  exports: {
+    initDB: async () => {},
+    isDbConnected: () => true,
+    generateDueRecurringTasks: async () => 0,
+    getPool: () => ({
+      query: async (sql, params = []) => {
+        queryLog.push({ sql, params });
+        return [queryHandler(sql, params)];
+      }
+    })
+  }
+};
+
+const { app } = require('../server/index');
+const { JWT_SECRET } = require('../server/middleware/auth');
+const { getTodayRange } = require('../server/utils/dateRange');
+
+let server;
+let baseUrl;
+
+test.before(async () => {
+  await new Promise((resolve) => { server = app.listen(0, resolve); });
+  baseUrl = `http://127.0.0.1:${server.address().port}`;
+});
+
+test.after(() => new Promise((resolve) => server.close(resolve)));
+test.beforeEach(() => {
+  queryLog.length = 0;
+  queryHandler = () => [];
+});
+
+const users = {
+  STAF: { id: 11, role: 'STAF', bidang_id: 1, nama: 'Staf' },
+  KABID: { id: 21, role: 'KABID', bidang_id: 1, nama: 'Kabid' },
+  WAKIL_MUDIR: { id: 31, role: 'WAKIL_MUDIR', bidang_id: null, nama: 'Wakil' },
+  WADIR_PEND: { id: 32, role: 'WADIR_PEND', bidang_id: null, nama: 'Wadir' },
+  MUDIR: { id: 41, role: 'MUDIR', bidang_id: null, nama: 'Mudir' },
+  SUPER_ADMIN: { id: 51, role: 'SUPER_ADMIN', bidang_id: null, nama: 'Admin' }
+};
+
+function request(path, role, options = {}) {
+  const token = jwt.sign(users[role], JWT_SECRET, { expiresIn: '1h' });
+  return fetch(`${baseUrl}${path}`, {
+    ...options,
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json', ...options.headers }
+  });
+}
+
+test('getTodayRange mengembalikan batas hari ini [00:00, besok 00:00)', () => {
+  assert.deepEqual(getTodayRange(new Date(2026, 9, 26, 17, 24, 6)), {
+    start: '2026-10-26 00:00:00',
+    end: '2026-10-27 00:00:00'
+  });
+  assert.deepEqual(getTodayRange(new Date(2026, 11, 31, 23, 59, 59)), {
+    start: '2026-12-31 00:00:00',
+    end: '2027-01-01 00:00:00'
+  });
+  assert.deepEqual(getTodayRange(new Date(2026, 0, 1, 0, 0, 0)), {
+    start: '2026-01-01 00:00:00',
+    end: '2026-01-02 00:00:00'
+  });
+});
+
+test('GET /api/tasks/today hanya mengambil tugas pada tanggal hari ini', async () => {
+  const { start, end } = getTodayRange();
+  const tasks = [
+    { id: 1, judul: 'Kemarin', due_date: '2000-01-01 08:00:00' },
+    { id: 2, judul: 'Hari ini', due_date: start.replace('00:00:00', '09:00:00') },
+    { id: 3, judul: 'Besok', due_date: end.replace('00:00:00', '09:00:00') }
+  ];
+  queryHandler = (sql, params) => tasks.filter((task) => task.due_date >= params[0] && task.due_date < params[1]);
+
+  const response = await request('/api/tasks/today', 'MUDIR');
+  const body = await response.json();
+
+  assert.equal(response.status, 200);
+  assert.equal(body.date, start.slice(0, 10));
+  assert.deepEqual(body.data.map((task) => task.judul), ['Hari ini']);
+  assert.match(queryLog[0].sql, /t\.due_date >= \? AND t\.due_date < \?/);
+  assert.deepEqual(queryLog[0].params.slice(0, 2), [start, end]);
+});
+
+test('GET /api/tasks/today mengurutkan tugas selesai terakhir lalu waktu dan prioritas', async () => {
+  await request('/api/tasks/today', 'SUPER_ADMIN');
+  assert.match(queryLog[0].sql, /ORDER BY CASE WHEN t\.status = 'COMPLETED' THEN 1 ELSE 0 END ASC,\s+t\.due_date ASC,\s+FIELD\(t\.prioritas, 'URGEN', 'TINGGI', 'SEDANG', 'RENDAH'\) ASC/);
+});
+
+test('GET /api/tasks/today tetap membatasi visibilitas sesuai peran', async () => {
+  await request('/api/tasks/today', 'STAF');
+  assert.match(queryLog[0].sql, /t\.assigned_to = \?/);
+  assert.equal(queryLog[0].params.at(-1), users.STAF.id);
+
+  queryLog.length = 0;
+  await request('/api/tasks/today', 'KABID');
+  assert.match(queryLog[0].sql, /t\.bidang_id = \? OR t\.created_by = \? OR t\.assigned_to = \?/);
+  assert.deepEqual(queryLog[0].params.slice(2), [users.KABID.bidang_id, users.KABID.id, users.KABID.id]);
+});
+
+test('GET /api/tasks/today menolak permintaan tanpa token', async () => {
+  const response = await fetch(`${baseUrl}/api/tasks/today`);
+  assert.equal(response.status, 401);
+});
+
+for (const role of ['KABID', 'WAKIL_MUDIR', 'WADIR_PEND', 'MUDIR', 'SUPER_ADMIN']) {
+  test(`GET /api/tasks (Manajemen Tugas) diizinkan untuk ${role}`, async () => {
+    const response = await request('/api/tasks', role);
+    assert.equal(response.status, 200);
+  });
+}
+
+test('GET /api/tasks (Manajemen Tugas) ditolak untuk STAF dengan 403 tanpa query ke database', async () => {
+  const response = await request('/api/tasks', 'STAF');
+  assert.equal(response.status, 403);
+  assert.equal(queryLog.length, 0);
+});
+
+test('Staf bisa memulai tugasnya sendiri dari dashboard (PATCH status)', async () => {
+  queryHandler = (sql) => (sql.startsWith('SELECT') ? [{ id: 7, assigned_to: users.STAF.id, bidang_id: 1 }] : {});
+
+  const response = await request('/api/tasks/7/status', 'STAF', {
+    method: 'PATCH',
+    body: JSON.stringify({ status: 'IN_PROGRESS' })
+  });
+
+  assert.equal(response.status, 200);
+  const update = queryLog.find((entry) => entry.sql.includes('UPDATE tasks'));
+  assert.ok(update, 'UPDATE tasks harus dijalankan');
+  assert.deepEqual(update.params, ['IN_PROGRESS', users.STAF.id, '7']);
+});
+
+test('Staf tidak bisa memulai tugas milik orang lain', async () => {
+  queryHandler = (sql) => (sql.startsWith('SELECT') ? [{ id: 8, assigned_to: 999, bidang_id: 1 }] : {});
+
+  const response = await request('/api/tasks/8/status', 'STAF', {
+    method: 'PATCH',
+    body: JSON.stringify({ status: 'IN_PROGRESS' })
+  });
+
+  assert.equal(response.status, 403);
+  assert.equal(queryLog.some((entry) => entry.sql.includes('UPDATE tasks')), false);
+});
