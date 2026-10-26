@@ -133,11 +133,27 @@ export const api = {
     return handleResponse(res);
   },
 
-  async reviewTask(id, { action, catatan_revisi, catatan_reviewer, nilai_sop, nilai_waktu, nilai_kualitas }) {
+  async reviewTask(id, {
+    action,
+    catatan_revisi,
+    catatan_reviewer,
+    nilai_sop,
+    nilai_waktu,
+    nilai_kualitas,
+    pelaksana_ids
+  }) {
     const res = await fetch(`${BASE_URL}/tasks/${id}/review`, {
       method: 'POST',
       headers: getHeaders(),
-      body: JSON.stringify({ action, catatan_revisi, catatan_reviewer, nilai_sop, nilai_waktu, nilai_kualitas })
+      body: JSON.stringify({
+        action,
+        catatan_revisi,
+        catatan_reviewer,
+        nilai_sop,
+        nilai_waktu,
+        nilai_kualitas,
+        pelaksana_ids
+      })
     });
     return handleResponse(res);
   },

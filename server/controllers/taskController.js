@@ -34,6 +34,38 @@ function parseRating(value, label) {
   return Math.round(rating * 10) / 10;
 }
 
+function parseExecutorIds(value) {
+  const values = Array.isArray(value) ? value : [value];
+  if (!values.length || values.some((item) => item === undefined || item === null || String(item).trim() === '')) {
+    throw new Error('Pilih setidaknya satu pelaksana tugas.');
+  }
+
+  const ids = [];
+  for (const item of values) {
+    const id = Number(item);
+    if (!Number.isSafeInteger(id) || id < 1) {
+      throw new Error('Pilihan pelaksana tugas tidak valid.');
+    }
+    if (!ids.includes(id)) ids.push(id);
+  }
+  return ids;
+}
+
+async function resolveExecutorSelection(db, value) {
+  const executorIds = value;
+  const placeholders = executorIds.map(() => '?').join(', ');
+  const [executorRows] = await db.query(
+    `SELECT id, nama FROM users WHERE id IN (${placeholders})`,
+    executorIds
+  );
+  if (executorRows.length !== executorIds.length) return null;
+  const executorById = new Map(executorRows.map((executor) => [Number(executor.id), executor]));
+  return {
+    executorIds,
+    executorNames: executorIds.map((executorId) => executorById.get(executorId).nama)
+  };
+}
+
 const TASK_LIST_SELECT = `
   SELECT t.*,
          creator.nama AS creator_nama, creator.role AS creator_role,
@@ -539,7 +571,14 @@ async function submitReview(req, res) {
   try {
     const { id } = req.params;
     const { id: userId } = req.user;
-    const { keterangan, kendala, solusi, anggaran_terpakai, pelaksana_id } = req.body;
+    const {
+      keterangan,
+      kendala,
+      solusi,
+      anggaran_terpakai,
+      pelaksana_id: singleExecutorId,
+      pelaksana_ids: selectedExecutorIds
+    } = req.body;
 
     const db = getPool();
     const [rows] = await db.query('SELECT t.*, b.parent_role FROM tasks t JOIN bidang b ON b.id = t.bidang_id WHERE t.id = ?', [id]);
@@ -548,15 +587,28 @@ async function submitReview(req, res) {
     }
     const task = rows[0];
 
-    // Only SUPER_ADMIN may record someone else as the executor of the task.
-    let executor = { id: userId, nama: req.user.nama };
-    const isExecutorOverride = req.user.role === 'SUPER_ADMIN' && pelaksana_id !== undefined && String(pelaksana_id).trim() !== '';
-    if (isExecutorOverride) {
-      const [executorRows] = await db.query('SELECT id, nama FROM users WHERE id = ?', [pelaksana_id]);
-      if (executorRows.length === 0) {
-        return res.status(400).json({ success: false, message: 'Pelaksana tugas tidak ditemukan.' });
+    const isSuperAdmin = req.user.role === 'SUPER_ADMIN';
+    if (!isSuperAdmin && (singleExecutorId !== undefined || selectedExecutorIds !== undefined)) {
+      return res.status(403).json({ success: false, message: 'Hanya Super Admin yang dapat memilih pelaksana tugas.' });
+    }
+
+    let executorIds = [userId];
+    let executorNames = [req.user.nama];
+    if (isSuperAdmin) {
+      let input;
+      try {
+        input = parseExecutorIds(selectedExecutorIds !== undefined
+          ? selectedExecutorIds
+          : (singleExecutorId !== undefined ? singleExecutorId : task.assigned_to));
+      } catch (error) {
+        return res.status(400).json({ success: false, message: error.message });
       }
-      executor = executorRows[0];
+      const selection = await resolveExecutorSelection(db, input);
+      if (!selection) {
+        return res.status(400).json({ success: false, message: 'Satu atau beberapa pelaksana tugas tidak ditemukan.' });
+      }
+      executorIds = selection.executorIds;
+      executorNames = selection.executorNames;
     }
     if (anggaran_terpakai === undefined || anggaran_terpakai === null || anggaran_terpakai === '') {
       return res.status(400).json({ success: false, message: 'Anggaran terpakai wajib diisi, termasuk dengan nilai 0.' });
@@ -579,18 +631,35 @@ async function submitReview(req, res) {
       return res.status(400).json({ success: false, message: 'Wajib mengunggah berkas bukti kerja atau memberikan keterangan.' });
     }
 
-    await db.query(
-      `UPDATE tasks SET status = 'UNDER_REVIEW', anggaran_terpakai = ?, bukti_kerja = COALESCE(?, bukti_kerja),
-       kendala = ?, solusi = ?, completed_by = ${isExecutorOverride ? '?' : 'COALESCE(completed_by, ?)'}, completed_at = COALESCE(completed_at, NOW())
-       WHERE id = ?`,
-      [spent, bukti_kerja, String(kendala || '').trim() || null, String(solusi || '').trim() || null, executor.id, id]
-    );
+    const connection = await db.getConnection();
+    try {
+      await connection.beginTransaction();
+      await connection.query(
+        `UPDATE tasks SET status = 'UNDER_REVIEW', anggaran_terpakai = ?, bukti_kerja = COALESCE(?, bukti_kerja),
+         kendala = ?, solusi = ?, completed_by = ${isSuperAdmin ? '?' : 'COALESCE(completed_by, ?)'}, completed_at = COALESCE(completed_at, NOW())
+         WHERE id = ?`,
+        [spent, bukti_kerja, String(kendala || '').trim() || null, String(solusi || '').trim() || null, executorIds[0], id]
+      );
+      if (isSuperAdmin) {
+        await connection.query('DELETE FROM task_executors WHERE task_id = ?', [id]);
+        await connection.query(
+          `INSERT INTO task_executors (task_id, user_id) VALUES ${executorIds.map(() => '(?, ?)').join(', ')}`,
+          executorIds.flatMap((executorId) => [id, executorId])
+        );
+      }
+      await connection.commit();
+    } catch (error) {
+      await connection.rollback();
+      throw error;
+    } finally {
+      connection.release();
+    }
 
     // Notify task creator
     await createNotification({
       userId: task.created_by,
       judul: `Bukti Kerja Dikirim: ${task.judul}`,
-      pesan: `${executor.nama} telah mengunggah bukti kerja untuk tugas "${task.judul}". Siap untuk diverifikasi.`,
+      pesan: `${executorNames.join(', ')} tercatat sebagai pelaksana tugas "${task.judul}". Bukti kerja siap untuk diverifikasi.`,
       tipe: 'REVIEW_PEKERJAAN',
       referenceId: task.id,
       referenceType: 'tasks'
@@ -606,7 +675,16 @@ async function submitReview(req, res) {
 async function reviewTask(req, res) {
   try {
     const { id } = req.params;
-    const { action, catatan_revisi, nilai_sop, nilai_waktu, nilai_kualitas, catatan_reviewer } = req.body; // action: 'APPROVE' or 'REJECT'
+    const {
+      action,
+      catatan_revisi,
+      nilai_sop,
+      nilai_waktu,
+      nilai_kualitas,
+      catatan_reviewer,
+      pelaksana_ids: selectedExecutorIds,
+      pelaksana_id: singleExecutorId
+    } = req.body; // action: 'APPROVE' or 'REJECT'
     const { id: userId, role, bidang_id: userBidangId } = req.user;
 
     if (!['APPROVE', 'REJECT'].includes(action)) {
@@ -660,17 +738,71 @@ async function reviewTask(req, res) {
       });
     }
 
+    const hasExecutorSelection = selectedExecutorIds !== undefined || singleExecutorId !== undefined;
+    if (hasExecutorSelection && role !== 'SUPER_ADMIN') {
+      return res.status(403).json({ success: false, message: 'Hanya Super Admin yang dapat memilih pelaksana tugas.' });
+    }
+    if (hasExecutorSelection && action !== 'APPROVE') {
+      return res.status(400).json({ success: false, message: 'Pelaksana hanya dapat ditentukan saat menyetujui hasil tugas.' });
+    }
+
+    let executorSelection = null;
+    if (hasExecutorSelection) {
+      let executorIds;
+      try {
+        executorIds = parseExecutorIds(selectedExecutorIds !== undefined ? selectedExecutorIds : singleExecutorId);
+      } catch (error) {
+        return res.status(400).json({ success: false, message: error.message });
+      }
+      executorSelection = await resolveExecutorSelection(db, executorIds);
+      if (!executorSelection) {
+        return res.status(400).json({ success: false, message: 'Satu atau beberapa pelaksana tugas tidak ditemukan.' });
+      }
+    }
+
     const newStatus = action === 'APPROVE' ? 'COMPLETED' : 'REVISION';
     const notes = action === 'REJECT' ? catatan_revisi.trim() : null;
 
-    await db.query(
-      `UPDATE tasks SET status = ?, catatan_revisi = ?, catatan_reviewer = ?, nilai_sop = ?, nilai_waktu = ?, nilai_kualitas = ?,
-       completed_by = CASE WHEN ? = 'COMPLETED' THEN COALESCE(completed_by, ?) ELSE completed_by END,
-       completed_at = CASE WHEN ? = 'COMPLETED' THEN NOW() ELSE completed_at END
-       WHERE id = ?`,
-      [newStatus, notes, catatan_reviewer && catatan_reviewer.trim() ? catatan_reviewer.trim() : null,
-        ratings.sop, ratings.waktu, ratings.kualitas, newStatus, userId, newStatus, id]
-    );
+    const reviewParams = [
+      newStatus,
+      notes,
+      catatan_reviewer && catatan_reviewer.trim() ? catatan_reviewer.trim() : null,
+      ratings.sop,
+      ratings.waktu,
+      ratings.kualitas
+    ];
+    if (executorSelection) {
+      const connection = await db.getConnection();
+      try {
+        await connection.beginTransaction();
+        await connection.query(
+          `UPDATE tasks SET status = ?, catatan_revisi = ?, catatan_reviewer = ?, nilai_sop = ?, nilai_waktu = ?, nilai_kualitas = ?,
+           completed_by = CASE WHEN ? = 'COMPLETED' THEN ? ELSE completed_by END,
+           completed_at = CASE WHEN ? = 'COMPLETED' THEN NOW() ELSE completed_at END
+           WHERE id = ?`,
+          [...reviewParams, newStatus, executorSelection.executorIds[0], newStatus, id]
+        );
+        await connection.query('DELETE FROM task_executors WHERE task_id = ?', [id]);
+        await connection.query(
+          `INSERT INTO task_executors (task_id, user_id) VALUES ${executorSelection.executorIds.map(() => '(?, ?)').join(', ')}`,
+          executorSelection.executorIds.flatMap((executorId) => [id, executorId])
+        );
+        await connection.commit();
+      } catch (error) {
+        await connection.rollback();
+        throw error;
+      } finally {
+        connection.release();
+      }
+    } else {
+      await db.query(
+        `UPDATE tasks SET status = ?, catatan_revisi = ?, catatan_reviewer = ?, nilai_sop = ?, nilai_waktu = ?, nilai_kualitas = ?,
+         completed_by = CASE WHEN ? = 'COMPLETED' THEN COALESCE(completed_by, ?) ELSE completed_by END,
+         completed_at = CASE WHEN ? = 'COMPLETED' THEN NOW() ELSE completed_at END
+         WHERE id = ?`,
+        [...reviewParams, newStatus, userId, newStatus, id]
+      );
+    }
 
     // Notify assignee
     await createNotification({
@@ -749,6 +881,7 @@ module.exports = {
   getTasks,
   getTodayTasks,
   buildTaskVisibility,
+  parseExecutorIds,
   getTaskById,
   createTask,
   updateTask,

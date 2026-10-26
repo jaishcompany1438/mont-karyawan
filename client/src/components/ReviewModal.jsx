@@ -1,12 +1,19 @@
 import React, { useEffect, useState } from 'react';
 import { api } from '../services/api';
-import { X, CheckCircle, RotateCcw, Paperclip, FileText, User } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
+import { X, CheckCircle, RotateCcw, Paperclip, FileText } from 'lucide-react';
 import SuccessToast from './SuccessToast';
+import ExecutorPicker from './ExecutorPicker';
 
 export default function ReviewModal({ isOpen, onClose, onSuccess, task }) {
+  const { user } = useAuth();
+  const isSuperAdmin = user?.role === 'SUPER_ADMIN';
   const [catatanRevisi, setCatatanRevisi] = useState('');
   const [catatanReviewer, setCatatanReviewer] = useState('');
   const [ratings, setRatings] = useState({ sop: '3', waktu: '3', kualitas: '3' });
+  const [pelaksanaIds, setPelaksanaIds] = useState([]);
+  const [pelaksanaOptions, setPelaksanaOptions] = useState([]);
+  const [loadingPelaksana, setLoadingPelaksana] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -20,10 +27,23 @@ export default function ReviewModal({ isOpen, onClose, onSuccess, task }) {
         waktu: String(task.nilai_waktu ?? '3'),
         kualitas: String(task.nilai_kualitas ?? '3')
       });
+      const defaultExecutorId = task.completed_by || task.assigned_to;
+      setPelaksanaIds(defaultExecutorId ? [String(defaultExecutorId)] : []);
       setError('');
       setSuccess('');
     }
   }, [isOpen, task]);
+
+  useEffect(() => {
+    if (!isOpen || !isSuperAdmin) return undefined;
+    let cancelled = false;
+    setLoadingPelaksana(true);
+    api.getUsers()
+      .then((response) => { if (!cancelled) setPelaksanaOptions(response.data || []); })
+      .catch(() => { if (!cancelled) setError('Gagal memuat daftar pelaksana tugas.'); })
+      .finally(() => { if (!cancelled) setLoadingPelaksana(false); });
+    return () => { cancelled = true; };
+  }, [isOpen, isSuperAdmin]);
 
   if (!isOpen || !task) return null;
 
@@ -41,13 +61,19 @@ export default function ReviewModal({ isOpen, onClose, onSuccess, task }) {
         return;
       }
 
+      if (action === 'APPROVE' && isSuperAdmin && !pelaksanaIds.length) {
+        setError('Pilih setidaknya satu pelaksana tugas.');
+        return;
+      }
+
       await api.reviewTask(task.id, {
         action,
         catatan_revisi: catatanRevisi.trim(),
         catatan_reviewer: catatanReviewer.trim(),
         nilai_sop: ratings.sop,
         nilai_waktu: ratings.waktu,
-        nilai_kualitas: ratings.kualitas
+        nilai_kualitas: ratings.kualitas,
+        pelaksana_ids: action === 'APPROVE' && isSuperAdmin ? pelaksanaIds : undefined
       });
 
       setSuccess(action === 'APPROVE' ? 'Tugas berhasil disetujui.' : 'Tugas berhasil dikirim untuk revisi.');
@@ -135,6 +161,18 @@ export default function ReviewModal({ isOpen, onClose, onSuccess, task }) {
               <p className="text-slate-500 italic mt-1">Tidak ada berkas bukti kerja terlampir.</p>
             )}
           </div>
+
+          {isSuperAdmin && (
+            <ExecutorPicker
+              options={pelaksanaOptions}
+              selectedIds={pelaksanaIds}
+              loading={loadingPelaksana}
+              helpText="Pilih satu atau beberapa pelaksana. Pelaksana sebelumnya atau penerima tugas dipilih secara default."
+              onChange={(id, checked) => setPelaksanaIds((current) => checked
+                ? [...new Set([...current, id])]
+                : current.filter((selectedId) => selectedId !== id))}
+            />
+          )}
 
           {/* Revision Notes Input */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
