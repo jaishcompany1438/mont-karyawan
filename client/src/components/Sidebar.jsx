@@ -26,7 +26,8 @@ export default function Sidebar({
   const { user } = useAuth();
   const role = user?.role;
 
-  const canCreateTask = ['SUPER_ADMIN', 'MUDIR', 'WADIR_PEND', 'WADIR_PENGS', 'KABID'].includes(role);
+  const canCreateTask = Boolean(role);
+  const canImportTasks = ['SUPER_ADMIN', 'MUDIR', 'WADIR_PEND', 'WADIR_PENGS', 'KABID'].includes(role);
   // Setiap bidang bisa mengakses kecuali bawahan bidang (STAF)
   const canAccessCrossDept = canAccessTab('cross-requests', user);
 
@@ -71,11 +72,11 @@ export default function Sidebar({
               className="w-full flex items-center justify-center space-x-2 app-blue-gradient hover:brightness-105 text-white font-medium py-2.5 px-4 rounded-xl shadow-md shadow-blue-900/30 transition-all text-xs"
             >
               <PlusCircle className="w-4 h-4" />
-              <span>+ Buat Tugas Baru</span>
+              <span>{role === 'STAF' || role === 'WAKIL_MUDIR' ? '+ Tambah Pekerjaan' : '+ Buat Tugas Baru'}</span>
             </button>
           )}
 
-          {canCreateTask && (
+          {canImportTasks && (
             <button
               onClick={() => {
                 if (onClose) onClose();

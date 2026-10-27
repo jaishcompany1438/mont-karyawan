@@ -396,3 +396,89 @@ test('agregasi laporan mencantumkan seluruh pelaksana pilihan Super Admin', () =
 
   assert.equal(row.pelaksana, 'Pengguna 11\nPengguna 12');
 });
+
+test('Staf dapat membuat pekerjaan yang ditugaskan kepada dirinya sendiri', async () => {
+  queryHandler = (sql) => {
+    if (sql.startsWith('SELECT id, role, bidang_id FROM users WHERE id =')) {
+      return [{ id: users.STAF.id, role: 'STAF', bidang_id: users.STAF.bidang_id }];
+    }
+    if (sql.startsWith('INSERT INTO tasks')) return { insertId: 73 };
+    if (sql.startsWith('INSERT INTO notifications')) return { insertId: 91 };
+    return [];
+  };
+  const response = await request('/api/tasks', 'STAF', {
+    method: 'POST',
+    body: JSON.stringify({
+      judul: 'Pekerjaan pribadi',
+      assigned_to: users.STAF.id,
+      bidang_id: users.STAF.bidang_id,
+      due_date: '2026-10-28T17:00',
+      anggaran_dana: '0',
+      is_recurring: '0'
+    })
+  });
+  const body = await response.json();
+
+  assert.equal(response.status, 201);
+  assert.equal(body.success, true);
+  const insert = queryLog.find((entry) => entry.sql.startsWith('INSERT INTO tasks'));
+  assert.equal(insert.params[5], users.STAF.id);
+  assert.equal(insert.params[6], users.STAF.id);
+  assert.equal(insert.params[7], users.STAF.bidang_id);
+});
+
+test('Staf tidak dapat membuat pekerjaan untuk pengguna lain', async () => {
+  const response = await request('/api/tasks', 'STAF', {
+    method: 'POST',
+    body: JSON.stringify({
+      judul: 'Penugasan tidak sah',
+      assigned_to: 99,
+      bidang_id: users.STAF.bidang_id,
+      due_date: '2026-10-28T17:00',
+      anggaran_dana: '0'
+    })
+  });
+
+  assert.equal(response.status, 403);
+  assert.equal(queryLog.some((entry) => entry.sql.startsWith('INSERT INTO tasks')), false);
+});
+
+test('Pengguna ditolak menghapus tugas yang ditugaskan kepadanya, termasuk Super Admin', async () => {
+  queryHandler = (sql) => (sql.startsWith('SELECT created_by, assigned_to')
+    ? [{ created_by: 99, assigned_to: users.SUPER_ADMIN.id }]
+    : []);
+  const response = await request('/api/tasks/73', 'SUPER_ADMIN', { method: 'DELETE' });
+
+  assert.equal(response.status, 403);
+  assert.equal(queryLog.some((entry) => entry.sql.startsWith('DELETE FROM tasks')), false);
+});
+
+test('Super Admin dapat menghapus tugas yang tidak ditugaskan kepadanya', async () => {
+  queryHandler = (sql) => {
+    if (sql.startsWith('SELECT created_by, assigned_to')) {
+      return [{ created_by: 99, assigned_to: users.STAF.id }];
+    }
+    if (sql.startsWith('DELETE FROM tasks WHERE id =')) return { affectedRows: 1 };
+    return [];
+  };
+  const response = await request('/api/tasks/73', 'SUPER_ADMIN', { method: 'DELETE' });
+
+  assert.equal(response.status, 200);
+  assert.ok(queryLog.some((entry) => entry.sql.startsWith('DELETE FROM tasks WHERE id =')));
+});
+
+test('Hapus massal menolak tugas yang ditugaskan kepada Super Admin', async () => {
+  queryHandler = (sql) => {
+    if (sql.startsWith('SELECT id, assigned_to')) {
+      return [{ id: 73, assigned_to: users.SUPER_ADMIN.id }];
+    }
+    return [];
+  };
+  const response = await request('/api/tasks', 'SUPER_ADMIN', {
+    method: 'DELETE',
+    body: JSON.stringify({ ids: [73] })
+  });
+
+  assert.equal(response.status, 403);
+  assert.equal(queryLog.some((entry) => entry.sql.startsWith('DELETE FROM tasks')), false);
+});

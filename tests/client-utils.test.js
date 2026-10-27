@@ -78,6 +78,40 @@ test('filter status dan penghitung status dashboard', async () => {
   assert.deepEqual(countTasksByStatus(tasks), { TO_DO: 2, COMPLETED: 1 });
 });
 
+test('pencarian dan filter dashboard dapat digabung dan direset dengan filter kosong', async () => {
+  const { filterDashboardTasks } = await loadActions();
+  const tasks = [
+    { judul: 'Perbaikan perpustakaan', deskripsi: 'Rak buku', status: 'TO_DO', prioritas: 'TINGGI', assigned_to: 10, assignee_nama: 'Ahmad' },
+    { judul: 'Pengecekan kelas', deskripsi: 'Periksa kebersihan', status: 'IN_PROGRESS', prioritas: 'TINGGI', assigned_to: 11, assignee_nama: 'Fatimah' },
+    { judul: 'Jadwal piket', deskripsi: 'Area kelas', status: 'TO_DO', prioritas: 'RENDAH', assigned_to: 10, assignee_nama: 'Ahmad' }
+  ];
+
+  assert.deepEqual(filterDashboardTasks(tasks, {
+    search: 'PERPUSTAKAAN',
+    status: 'TO_DO',
+    priority: 'TINGGI',
+    assigneeId: '10'
+  }), [tasks[0]]);
+  assert.deepEqual(filterDashboardTasks(tasks, { search: 'fatimah' }), [tasks[1]]);
+  assert.deepEqual(filterDashboardTasks(tasks, {
+    search: '',
+    status: '',
+    priority: '',
+    assigneeId: ''
+  }), tasks);
+});
+
+test('pengguna tidak dapat menghapus tugas yang ditugaskan kepadanya', async () => {
+  const { canDeleteTask } = await loadActions();
+  const staf = user('STAF');
+  const kendiAssignedTask = { assigned_to: '1', created_by: 1 };
+  assert.equal(canDeleteTask(kendiAssignedTask, staf), false);
+  assert.equal(canDeleteTask({ assigned_to: 2, created_by: 1 }, staf), true);
+  const superAdmin = user('SUPER_ADMIN', { id: 51 });
+  assert.equal(canDeleteTask({ assigned_to: 2, created_by: 77 }, superAdmin), true);
+  assert.equal(canDeleteTask({ assigned_to: 51, created_by: 77 }, superAdmin), false);
+});
+
 test('tugas sepanjang hari (00:00) tidak langsung dianggap terlambat', async () => {
   const { isOverdueToday } = await loadActions();
   const now = new Date(2026, 9, 26, 17, 0, 0);

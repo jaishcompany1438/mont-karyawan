@@ -255,10 +255,6 @@ async function createTask(req, res) {
   try {
     const { role, bidang_id: creatorBidangId, id: creatorId } = req.user;
 
-    if (role === 'STAF') {
-      return res.status(403).json({ success: false, message: 'Staf tidak memiliki izin untuk membuat tugas.' });
-    }
-
     const {
       judul,
       deskripsi,
@@ -281,6 +277,11 @@ async function createTask(req, res) {
     const budget = Number(anggaran_dana);
     if (!Number.isFinite(budget) || budget < 0) return res.status(400).json({ success: false, message: 'Anggaran dana harus berupa angka nol atau lebih.' });
 
+    const requestedSelfAssignment = String(assigned_to) === String(creatorId);
+    if (['STAF', 'WAKIL_MUDIR'].includes(role) && !requestedSelfAssignment) {
+      return res.status(403).json({ success: false, message: 'Anda hanya dapat membuat pekerjaan untuk diri sendiri.' });
+    }
+
     const db = getPool();
     let holidayExclusions;
     try {
@@ -296,20 +297,34 @@ async function createTask(req, res) {
     }
 
     const assignee = assigneeRows[0];
+    const isSelfAssigned = String(assignee.id) === String(creatorId);
 
     if (role === 'KABID') {
-      // Kabid -> Hanya boleh memilih Staf di bidangnya
-      if (assignee.role !== 'STAF' || assignee.bidang_id !== creatorBidangId) {
+      // Kabid may create their own work or assign work to staff in their own bidang.
+      if (isSelfAssigned) {
+        if (assignee.bidang_id !== creatorBidangId) {
+          return res.status(403).json({ success: false, message: 'Kepala Bidang hanya dapat membuat pekerjaan sendiri di bidangnya.' });
+        }
+      } else if (assignee.role !== 'STAF' || assignee.bidang_id !== creatorBidangId) {
         return res.status(403).json({
           success: false,
           message: 'Kepala Bidang hanya boleh menugaskan tugas kepada Staf di dalam bidangnya sendiri.'
         });
       }
     } else if (role === 'WAKIL_MUDIR') {
-      return res.status(403).json({ success: false, message: 'Role Wakil Mudir lama tidak memiliki cabang. Gunakan WADIR_PEND atau WADIR_PENGS.' });
+      if (!isSelfAssigned) {
+        return res.status(403).json({ success: false, message: 'Wakil Mudir hanya dapat membuat pekerjaan untuk dirinya sendiri.' });
+      }
+    } else if (role === 'STAF') {
+      if (!isSelfAssigned) {
+        return res.status(403).json({ success: false, message: 'Anda hanya dapat membuat pekerjaan untuk diri sendiri.' });
+      }
     } else if (role === 'WADIR_PEND' || role === 'WADIR_PENGS') {
-      const [branchRows] = await db.query('SELECT parent_role FROM bidang WHERE id = ?', [assignee.bidang_id]);
-      if (!['KABID', 'STAF'].includes(assignee.role) || !branchRows[0] || branchRows[0].parent_role !== role) {
+      let branchRows = [];
+      if (!isSelfAssigned) {
+        [branchRows] = await db.query('SELECT parent_role FROM bidang WHERE id = ?', [assignee.bidang_id]);
+      }
+      if (!isSelfAssigned && (!['KABID', 'STAF'].includes(assignee.role) || !branchRows[0] || branchRows[0].parent_role !== role)) {
         return res.status(403).json({ success: false, message: 'Wadir hanya dapat menugaskan kepada Kabid atau Staf di bawah cabangnya.' });
       }
     }
@@ -319,6 +334,12 @@ async function createTask(req, res) {
     const targetBidangId = bidang_id || assignee.bidang_id || creatorBidangId;
     if (!targetBidangId) {
       return res.status(400).json({ success: false, message: 'Bidang penugasan harus ditentukan.' });
+    }
+    if (role === 'STAF' && String(targetBidangId) !== String(creatorBidangId)) {
+      return res.status(403).json({ success: false, message: 'Pekerjaan Staf hanya dapat dibuat di bidangnya sendiri.' });
+    }
+    if (role === 'KABID' && isSelfAssigned && String(targetBidangId) !== String(creatorBidangId)) {
+      return res.status(403).json({ success: false, message: 'Pekerjaan Kepala Bidang hanya dapat dibuat di bidangnya sendiri.' });
     }
     if (role === 'WADIR_PEND' || role === 'WADIR_PENGS') {
       const [targetBranch] = await db.query('SELECT parent_role FROM bidang WHERE id = ?', [targetBidangId]);
@@ -834,9 +855,13 @@ async function deleteTask(req, res) {
     const { role, id: userId } = req.user;
     const db = getPool();
 
-    const [rows] = await db.query('SELECT created_by FROM tasks WHERE id = ?', [id]);
+    const [rows] = await db.query('SELECT created_by, assigned_to FROM tasks WHERE id = ?', [id]);
     if (rows.length === 0) {
       return res.status(404).json({ success: false, message: 'Tugas tidak ditemukan.' });
+    }
+
+    if (String(rows[0].assigned_to) === String(userId)) {
+      return res.status(403).json({ success: false, message: 'Anda tidak dapat menghapus pekerjaan yang ditugaskan kepada Anda.' });
     }
 
     if (role === 'KABID' || (role !== 'SUPER_ADMIN' && role !== 'MUDIR' && rows[0].created_by !== userId)) {
@@ -867,7 +892,16 @@ async function deleteTasks(req, res) {
     }
 
     const placeholders = normalizedIds.map(() => '?').join(',');
-    const [result] = await getPool().query(
+    const db = getPool();
+    const [assignedTasks] = await db.query(
+      `SELECT id, assigned_to FROM tasks WHERE id IN (${placeholders})`,
+      normalizedIds
+    );
+    if (assignedTasks.some((task) => String(task.assigned_to) === String(req.user.id))) {
+      return res.status(403).json({ success: false, message: 'Anda tidak dapat menghapus pekerjaan yang ditugaskan kepada Anda.' });
+    }
+
+    const [result] = await db.query(
       `DELETE FROM tasks WHERE id IN (${placeholders})`,
       normalizedIds
     );

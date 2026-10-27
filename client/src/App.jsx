@@ -74,7 +74,13 @@ function AuthenticatedApp() {
 
   const pageProps = { refreshKey, onRefresh: refresh };
   const page = {
-    dashboard: <Dashboard {...pageProps} onOpenSubmitWork={setSubmitTask} />,
+    dashboard: (
+      <Dashboard
+        {...pageProps}
+        onOpenCreateTask={() => setTaskModalOpen(true)}
+        onOpenSubmitWork={setSubmitTask}
+      />
+    ),
     tasks: (
       <Tasks
         {...pageProps}

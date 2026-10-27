@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../services/api';
+import { useAuth } from '../context/AuthContext';
 import { X, Upload, Calendar, User, Flag, Clock, CheckCircle2 } from 'lucide-react';
 import SuccessToast from './SuccessToast';
 
 export default function TaskModal({ isOpen, onClose, onSuccess, initialTask = null }) {
+  const { user } = useAuth();
   const [judul, setJudul] = useState('');
   const [deskripsi, setDeskripsi] = useState('');
   const [periode, setPeriode] = useState('HARIAN');
@@ -27,6 +29,8 @@ export default function TaskModal({ isOpen, onClose, onSuccess, initialTask = nu
   ];
 
   const [assignees, setAssignees] = useState([]);
+  const [bidangOptions, setBidangOptions] = useState([]);
+  const [taskBidangId, setTaskBidangId] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -34,6 +38,8 @@ export default function TaskModal({ isOpen, onClose, onSuccess, initialTask = nu
   useEffect(() => {
     if (isOpen) {
       loadAssignees();
+      api.getBidang().then((result) => setBidangOptions(result.data || []))
+        .catch((err) => setError(err.message));
       if (initialTask) {
         setJudul(initialTask.judul || '');
         setDeskripsi(initialTask.deskripsi || '');
@@ -41,6 +47,7 @@ export default function TaskModal({ isOpen, onClose, onSuccess, initialTask = nu
         setKategori(initialTask.kategori || 'RUTIN');
         setPrioritas(initialTask.prioritas || 'SEDANG');
         setAssignedTo(initialTask.assigned_to || '');
+        setTaskBidangId(String(initialTask.bidang_id || ''));
         setIsRecurring(Boolean(initialTask.is_recurring));
         setAnggaranDana(String(initialTask.anggaran_dana ?? 0));
         try {
@@ -58,7 +65,9 @@ export default function TaskModal({ isOpen, onClose, onSuccess, initialTask = nu
         setPeriode('HARIAN');
         setKategori('RUTIN');
         setPrioritas('SEDANG');
-        setAssignedTo('');
+        const selfOnlyRole = ['STAF', 'WAKIL_MUDIR'].includes(user?.role);
+        setAssignedTo(selfOnlyRole && user?.id ? String(user.id) : '');
+        setTaskBidangId(String(user?.bidang_id || ''));
         // default due date: tomorrow 17:00
         const tomorrow = new Date();
         tomorrow.setDate(tomorrow.getDate() + 1);
@@ -73,28 +82,44 @@ export default function TaskModal({ isOpen, onClose, onSuccess, initialTask = nu
       setError('');
       setSuccess('');
     }
-  }, [isOpen, initialTask]);
+  }, [isOpen, initialTask, user]);
 
   const loadAssignees = async () => {
     try {
       const res = await api.getAssignees();
       if (res.success) {
-        setAssignees(res.data);
-        if (!initialTask && res.data.length > 0 && !assignedTo) {
-          setAssignedTo(res.data[0].id);
+        const available = [...res.data];
+        if (user && !available.some((assignee) => String(assignee.id) === String(user.id))) {
+          available.push({
+            id: user.id,
+            nama: user.nama,
+            role: user.role,
+            bidang_id: user.bidang_id,
+            nama_bidang: user.nama_bidang
+          });
+        }
+        setAssignees(available);
+        if (!initialTask) {
+          setAssignedTo((current) => current || String(available[0]?.id || user?.id || ''));
         }
       }
     } catch (err) {
-      console.error('Failed to load assignees:', err);
+      setError(err.message || 'Gagal memuat daftar penerima tugas.');
     }
   };
 
   if (!isOpen) return null;
 
+  const isSelfAssigned = !initialTask && String(assignedTo) === String(user?.id);
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!judul.trim() || !assignedTo || !dueDate || anggaranDana === '') {
       setError('Judul, penerima, tenggat waktu, dan anggaran dana wajib diisi.');
+      return;
+    }
+    if (isSelfAssigned && !taskBidangId) {
+      setError('Bidang pekerjaan Anda wajib dipilih.');
       return;
     }
 
@@ -109,6 +134,7 @@ export default function TaskModal({ isOpen, onClose, onSuccess, initialTask = nu
       formData.append('kategori', kategori);
       formData.append('prioritas', prioritas);
       formData.append('assigned_to', assignedTo);
+      if (taskBidangId) formData.append('bidang_id', taskBidangId);
       formData.append('due_date', dueDate);
       formData.append('is_recurring', isRecurring ? '1' : '0');
       formData.append('anggaran_dana', anggaranDana);
@@ -284,10 +310,28 @@ export default function TaskModal({ isOpen, onClose, onSuccess, initialTask = nu
                 <option value="">-- Pilih Staf / Penerima --</option>
                 {assignees.map((u) => (
                   <option key={u.id} value={u.id}>
-                    {u.nama} ({u.role} - {u.nama_bidang || 'Lembaga'})
+                    {String(u.id) === String(user?.id) ? 'Pekerjaan saya sendiri' : `${u.nama} (${u.role} - ${u.nama_bidang || 'Lembaga'})`}
                   </option>
                 ))}
               </select>
+              {isSelfAssigned && (
+                <div className="mt-3">
+                  <label className="block font-bold text-slate-700 mb-1">Bidang Pekerjaan *</label>
+                  <select
+                    required
+                    value={taskBidangId}
+                    onChange={(e) => setTaskBidangId(e.target.value)}
+                    disabled={Boolean(user?.bidang_id) && !['WADIR_PEND', 'WADIR_PENGS'].includes(user?.role)}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-300 focus:ring-2 focus:ring-blue-500 text-slate-800 bg-white font-medium disabled:bg-slate-100"
+                  >
+                    <option value="">-- Pilih bidang --</option>
+                    {bidangOptions.map((item) => (
+                      <option key={item.id} value={item.id}>{item.nama_bidang}</option>
+                    ))}
+                  </select>
+                  <p className="mt-1 text-[10px] text-slate-500">Tugas ini akan ditugaskan kepada akun Anda sendiri.</p>
+                </div>
+              )}
             </div>
 
             {['HARIAN', 'PEKANAN', 'BULANAN'].includes(periode) && (
