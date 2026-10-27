@@ -4,8 +4,8 @@ import { useAuth } from '../context/AuthContext';
 import ReviewModal from '../components/ReviewModal';
 import DelegateTaskModal from '../components/DelegateTaskModal';
 import SuccessToast from '../components/SuccessToast';
-import { STATUS_LABELS, countTasksByStatus, filterTasksByStatus, getTaskActions, isOverdueToday } from '../utils/taskActions';
-import { AlertTriangle, CalendarCheck, ChevronDown, FileSearch, Play, RefreshCw, Send, Users } from 'lucide-react';
+import { STATUS_LABELS, countTasksByStatus, filterDashboardTasks, getTaskActions, isOverdueToday } from '../utils/taskActions';
+import { AlertTriangle, CalendarCheck, ChevronDown, FileSearch, Play, Plus, RefreshCw, Search, Send, Users, X } from 'lucide-react';
 
 const STATUS_FILTERS = [
   ['', 'Semua'],
@@ -44,11 +44,14 @@ function formatDueTime(value) {
   return date.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
 }
 
-export default function Dashboard({ refreshKey, onRefresh, onOpenSubmitWork }) {
+export default function Dashboard({ refreshKey, onRefresh, onOpenCreateTask, onOpenSubmitWork }) {
   const { user } = useAuth();
   const [tasks, setTasks] = useState([]);
   const [today, setToday] = useState('');
   const [status, setStatus] = useState('');
+  const [search, setSearch] = useState('');
+  const [priority, setPriority] = useState('');
+  const [assigneeId, setAssigneeId] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [expandedId, setExpandedId] = useState(null);
@@ -109,7 +112,17 @@ export default function Dashboard({ refreshKey, onRefresh, onOpenSubmitWork }) {
   }, [onRefresh]);
 
   const counts = countTasksByStatus(tasks);
-  const visibleTasks = filterTasksByStatus(tasks, status);
+  const visibleTasks = filterDashboardTasks(tasks, { search, status, priority, assigneeId });
+  const assignees = [...new Map(
+    tasks.map((task) => [String(task.assigned_to), { id: task.assigned_to, nama: task.assignee_nama }])
+  ).values()].sort((first, second) => String(first.nama || '').localeCompare(String(second.nama || ''), 'id'));
+  const hasActiveFilters = Boolean(search.trim() || status || priority || assigneeId);
+  const resetFilters = () => {
+    setSearch('');
+    setStatus('');
+    setPriority('');
+    setAssigneeId('');
+  };
   const now = new Date();
 
   return (
@@ -125,15 +138,74 @@ export default function Dashboard({ refreshKey, onRefresh, onOpenSubmitWork }) {
             <CalendarCheck className="h-3.5 w-3.5 text-blue-600" /> {formatTodayLabel(today)}
           </p>
         </div>
-        <button
-          onClick={() => setReloadKey((value) => value + 1)}
-          className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50 transition"
-        >
-          <RefreshCw className="h-3.5 w-3.5" /> Segarkan
-        </button>
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={onOpenCreateTask}
+            className="flex items-center gap-2 rounded-xl bg-blue-700 px-3 py-2 text-xs font-semibold text-white hover:bg-blue-600 transition"
+          >
+            <Plus className="h-3.5 w-3.5" /> Tambah Pekerjaan
+          </button>
+          <button
+            type="button"
+            onClick={() => setReloadKey((value) => value + 1)}
+            className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50 transition"
+          >
+            <RefreshCw className="h-3.5 w-3.5" /> Segarkan
+          </button>
+        </div>
       </div>
 
       {error && <div className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs text-rose-700">{error}</div>}
+
+      <div className="grid gap-2 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm sm:grid-cols-2 lg:grid-cols-[minmax(220px,1fr)_180px_220px_auto]">
+        <label className="flex min-w-0 items-center gap-2 rounded-xl border border-slate-200 px-3 py-2 text-slate-400 focus-within:border-blue-400 focus-within:ring-2 focus-within:ring-blue-100">
+          <Search className="h-4 w-4 shrink-0" />
+          <input
+            type="search"
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            placeholder="Cari judul atau nama pekerjaan..."
+            aria-label="Cari judul atau nama pekerjaan"
+            className="w-full min-w-0 bg-transparent text-xs text-slate-800 outline-none placeholder:text-slate-400"
+          />
+        </label>
+        <label className="sr-only" htmlFor="dashboard-priority-filter">Filter prioritas</label>
+        <select
+          id="dashboard-priority-filter"
+          aria-label="Filter prioritas"
+          value={priority}
+          onChange={(event) => setPriority(event.target.value)}
+          className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-700"
+        >
+          <option value="">Semua prioritas</option>
+          <option value="URGEN">Urgen</option>
+          <option value="TINGGI">Tinggi</option>
+          <option value="SEDANG">Sedang</option>
+          <option value="RENDAH">Rendah</option>
+        </select>
+        <label className="sr-only" htmlFor="dashboard-assignee-filter">Filter penanggung jawab</label>
+        <select
+          id="dashboard-assignee-filter"
+          aria-label="Filter penanggung jawab"
+          value={assigneeId}
+          onChange={(event) => setAssigneeId(event.target.value)}
+          className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-700"
+        >
+          <option value="">Semua penanggung jawab</option>
+          {assignees.map((assignee) => (
+            <option key={assignee.id} value={assignee.id}>{assignee.nama || 'Tanpa nama'}</option>
+          ))}
+        </select>
+        <button
+          type="button"
+          onClick={resetFilters}
+          disabled={!hasActiveFilters}
+          className="flex items-center justify-center gap-1.5 rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          <X className="h-3.5 w-3.5" /> Reset
+        </button>
+      </div>
 
       <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1" aria-label="Filter status tugas hari ini">
         {STATUS_FILTERS.map(([value, label]) => (
@@ -160,7 +232,9 @@ export default function Dashboard({ refreshKey, onRefresh, onOpenSubmitWork }) {
           <p className="p-8 text-center text-xs text-slate-400">Memuat tugas hari ini...</p>
         ) : visibleTasks.length === 0 ? (
           <p className="p-8 text-center text-xs text-slate-400">
-            {tasks.length ? 'Tidak ada tugas dengan status ini hari ini.' : 'Tidak ada tugas untuk hari ini.'}
+            {tasks.length
+              ? 'Tidak ada tugas yang cocok dengan pencarian dan filter.'
+              : 'Tidak ada tugas untuk hari ini.'}
           </p>
         ) : (
           <ul className="divide-y divide-slate-100">

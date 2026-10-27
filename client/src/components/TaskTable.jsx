@@ -1,5 +1,6 @@
 import React from 'react';
 import { useAuth } from '../context/AuthContext';
+import { canDeleteTask } from '../utils/taskActions';
 import {
   FileText,
   Calendar,
@@ -27,6 +28,10 @@ export default function TaskTable({
 }) {
   const { user } = useAuth();
   const role = user?.role;
+  const deletableTasks = role === 'SUPER_ADMIN' ? tasks.filter((task) => canDeleteTask(task, user)) : [];
+  const deletableIds = new Set(deletableTasks.map((task) => String(task.id)));
+  const allDeletableSelected = deletableTasks.length > 0
+    && deletableTasks.every((task) => selectedIds.some((id) => String(id) === String(task.id)));
 
   const getStatusBadge = (status) => {
     switch (status) {
@@ -61,7 +66,7 @@ export default function TaskTable({
         <table className="w-full text-left border-collapse">
           <thead>
             <tr className="bg-slate-50 border-b border-slate-200 text-[11px] font-bold text-slate-600 uppercase tracking-wider">
-              <th className="py-3.5 px-2">{role === 'SUPER_ADMIN' && <input type="checkbox" checked={tasks.length > 0 && selectedIds.length === tasks.length} onChange={(e) => onSelectionChange(e.target.checked ? tasks.map((task) => task.id) : [])} />}</th><th className="py-3.5 px-4">Tugas</th>
+              <th className="py-3.5 px-2">{role === 'SUPER_ADMIN' && <input type="checkbox" aria-label="Pilih semua tugas yang dapat dihapus" checked={allDeletableSelected} onChange={(e) => onSelectionChange(e.target.checked ? [...new Set([...selectedIds, ...deletableTasks.map((task) => task.id)])] : selectedIds.filter((id) => !deletableIds.has(String(id))))} />}</th><th className="py-3.5 px-4">Tugas</th>
               <th className="py-3.5 px-3">Periode</th>
               <th className="py-3.5 px-3">Prioritas</th>
               <th className="py-3.5 px-3">Penerima & Bidang</th>
@@ -86,13 +91,14 @@ export default function TaskTable({
                                   (role === 'KABID' && task.bidang_id === user?.bidang_id &&
                                     task.assignee_role === 'STAF');
                 const canEdit = ['SUPER_ADMIN', 'MUDIR'].includes(role) || (task.created_by === user?.id && role !== 'KABID');
+                const canDelete = canDeleteTask(task, user);
                 const canDelegate = role === 'KABID' &&
                   task.bidang_id === user?.bidang_id &&
                   (task.created_by === user?.id || task.assigned_to === user?.id);
 
                 return (
                   <tr key={task.id} className="hover:bg-slate-50/70 transition-colors">
-                    <td className="py-3.5 px-2">{role === 'SUPER_ADMIN' && <input type="checkbox" checked={selectedIds.includes(task.id)} onChange={(e) => onSelectionChange(e.target.checked ? [...selectedIds, task.id] : selectedIds.filter((id) => id !== task.id))} />}</td>
+                    <td className="py-3.5 px-2">{role === 'SUPER_ADMIN' && canDelete && <input type="checkbox" aria-label={`Pilih ${task.judul} untuk dihapus`} checked={selectedIds.some((id) => String(id) === String(task.id))} onChange={(e) => onSelectionChange(e.target.checked ? [...selectedIds, task.id] : selectedIds.filter((id) => String(id) !== String(task.id)))} />}</td>
                     {/* Title & Description */}
                     <td className="py-3.5 px-4 max-w-[260px]">
                       <div className="group relative w-fit max-w-full">
@@ -225,7 +231,7 @@ export default function TaskTable({
                         )}
 
                         {/* Delete */}
-                        {canEdit && (
+                        {canDelete && (
                           <button
                             onClick={() => onDeleteTask(task.id)}
                             title="Hapus Tugas"
