@@ -1,6 +1,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const jwt = require('jsonwebtoken');
+const ExcelJS = require('exceljs');
 
 // Ganti modul database dengan pool palsu sebelum aplikasi dimuat.
 const dbPath = require.resolve('../server/config/db');
@@ -37,7 +38,7 @@ const { app } = require('../server/index');
 const { JWT_SECRET } = require('../server/middleware/auth');
 const { getTodayRange } = require('../server/utils/dateRange');
 const { aggregateReportRows, getReportRows } = require('../server/controllers/reportController');
-const { parseExecutorIds } = require('../server/controllers/taskController');
+const { parseExecutorIds, parseMoneyCents } = require('../server/controllers/taskController');
 
 let server;
 let baseUrl;
@@ -226,6 +227,20 @@ test('getReportRows memuat seluruh nama pelaksana yang terkait dengan tugas', as
   assert.match(queryLog[1].sql, /FROM task_executors te/);
 });
 
+test('getReportRows mengambil catatan pekerjaan dari catatan pelaksana, bukan deskripsi', async () => {
+  queryHandler = (sql) => {
+    if (sql.includes('FROM tasks t')) {
+      return [{ id: 8, deskripsi: 'Deskripsi instruksi', catatan_tugas: 'Tindak lanjut oleh pelaksana' }];
+    }
+    return [];
+  };
+
+  const rows = await getReportRows({ user: users.MUDIR, query: {} });
+
+  assert.match(queryLog[0].sql, /t\.catatan_pelaksana AS catatan_tugas/);
+  assert.deepEqual(rows[0].catatan_tugas, 'Tindak lanjut oleh pelaksana');
+});
+
 test('Wakil Mudir umum tidak dapat meminta ekspor laporan bidang koordinasi', async () => {
   const response = await request('/api/reports/export/excel?scope=coordinated', 'WAKIL_MUDIR');
 
@@ -251,6 +266,15 @@ test('parseExecutorIds menolak daftar kosong dan ID yang tidak valid', () => {
   assert.throws(() => parseExecutorIds([]), /Pilih setidaknya satu pelaksana/);
   assert.throws(() => parseExecutorIds(['12x']), /Pilihan pelaksana tugas tidak valid/);
   assert.throws(() => parseExecutorIds(['0']), /Pilihan pelaksana tugas tidak valid/);
+});
+
+test('parseMoneyCents menolak nilai negatif, di atas presisi dua desimal, dan di luar batas DECIMAL', () => {
+  assert.equal(parseMoneyCents('-1'), null);
+  assert.equal(parseMoneyCents('-0.01'), null);
+  assert.equal(parseMoneyCents('1.001'), null);
+  assert.equal(parseMoneyCents('10000000000000.00'), null);
+  assert.equal(parseMoneyCents('10.25'), 1025n);
+  assert.equal(parseMoneyCents('1e2'), 10000n);
 });
 
 test('Super Admin dapat menyimpan beberapa pelaksana saat mengirim hasil tugas', async () => {
@@ -288,7 +312,7 @@ test('Super Admin dapat menyimpan beberapa pelaksana saat mengirim hasil tugas',
   assert.ok(associationInsert);
   assert.deepEqual(associationInsert.params, ['7', 11, '7', 12]);
   const taskUpdate = queryLog.find((entry) => entry.sql.startsWith('UPDATE tasks SET status'));
-  assert.equal(taskUpdate.params[4], 11);
+  assert.equal(taskUpdate.params[5], 11);
   assert.ok(queryLog.some((entry) => entry.sql === 'COMMIT'));
 });
 
@@ -395,6 +419,148 @@ test('agregasi laporan mencantumkan seluruh pelaksana pilihan Super Admin', () =
   }]);
 
   assert.equal(row.pelaksana, 'Pengguna 11\nPengguna 12');
+});
+
+test('agregasi Catatan Tugas hanya memakai keterangan pelaksana, bukan deskripsi', () => {
+  const [row] = aggregateReportRows([
+    {
+      judul: 'Tugas laporan',
+      deskripsi: 'Deskripsi instruksi',
+      catatan_tugas: 'Tindak lanjut hari pertama',
+      periode: 'HARIAN',
+      status: 'COMPLETED'
+    },
+    {
+      judul: 'Tugas laporan',
+      deskripsi: 'Deskripsi instruksi',
+      catatan_tugas: 'Tindak lanjut hari kedua',
+      periode: 'HARIAN',
+      status: 'COMPLETED'
+    },
+    {
+      judul: 'Tugas laporan',
+      deskripsi: 'Deskripsi instruksi',
+      catatan_tugas: '',
+      periode: 'HARIAN',
+      status: 'TO_DO'
+    }
+  ]);
+
+  assert.equal(row.catatan_tugas, 'Tindak lanjut hari pertama\n- Tindak lanjut hari kedua');
+  assert.doesNotMatch(row.catatan_tugas, /Deskripsi instruksi/);
+});
+
+test('submit hasil menolak anggaran negatif dan nominal dengan presisi melebihi dua desimal', async () => {
+  queryHandler = (sql) => (sql.startsWith('SELECT t.*, b.parent_role')
+    ? [{
+      id: 7,
+      judul: 'Tugas anggaran',
+      created_by: 88,
+      assigned_to: users.STAF.id,
+      anggaran_dana: '100.00',
+      bukti_kerja: null
+    }]
+    : []);
+
+  for (const amount of ['-0.01', '100.001']) {
+    queryLog.length = 0;
+    const response = await request('/api/tasks/7/submit-review', 'STAF', {
+      method: 'POST',
+      body: JSON.stringify({
+        anggaran_terpakai: amount,
+        keterangan: 'Hasil tindak lanjut'
+      })
+    });
+    const body = await response.json();
+
+    assert.equal(response.status, 400, `Nilai ${amount} seharusnya ditolak`);
+    assert.equal(body.success, false);
+    assert.equal(queryLog.some((entry) => entry.sql === 'BEGIN TRANSACTION'), false);
+  }
+});
+
+test('submit hasil menyimpan keterangan dan menerima biaya yang melebihi pagu awal', async () => {
+  queryHandler = (sql) => {
+    if (sql.startsWith('SELECT t.*, b.parent_role')) {
+      return [{
+        id: 7,
+        judul: 'Tugas anggaran',
+        created_by: 88,
+        assigned_to: users.STAF.id,
+        anggaran_dana: '100.00',
+        bukti_kerja: null
+      }];
+    }
+    if (sql.startsWith('INSERT INTO notifications')) return { insertId: 91 };
+    return [];
+  };
+  const response = await request('/api/tasks/7/submit-review', 'STAF', {
+    method: 'POST',
+    body: JSON.stringify({
+      anggaran_terpakai: '125.75',
+      keterangan: 'Pekerjaan selesai dengan hasil yang telah diverifikasi'
+    })
+  });
+  const body = await response.json();
+
+  assert.equal(response.status, 200);
+  assert.equal(body.success, true);
+  const taskUpdate = queryLog.find((entry) => entry.sql.startsWith('UPDATE tasks SET status'));
+  assert.match(taskUpdate.sql, /catatan_pelaksana = COALESCE\(\?, catatan_pelaksana\)/);
+  assert.equal(taskUpdate.params[0], '125.75');
+  assert.equal(taskUpdate.params[1], 'Catatan: Pekerjaan selesai dengan hasil yang telah diverifikasi');
+  assert.equal(taskUpdate.params[2], 'Pekerjaan selesai dengan hasil yang telah diverifikasi');
+
+  const [reportRow] = aggregateReportRows([{
+    judul: 'Tugas anggaran',
+    periode: 'INSIDENTAL',
+    kategori: 'MENDADAK',
+    status: 'COMPLETED',
+    anggaran_dana: '100.00',
+    anggaran_terpakai: taskUpdate.params[0]
+  }]);
+  assert.equal(reportRow.remaining, -25.75);
+});
+
+test('laporan Excel menampilkan sisa saldo negatif saat pengeluaran melampaui pagu', async () => {
+  queryHandler = (sql) => {
+    if (sql.includes('FROM tasks t')) {
+      return [{
+        id: 9,
+        judul: 'Tugas dengan kelebihan biaya',
+        periode: 'INSIDENTAL',
+        kategori: 'MENDADAK',
+        prioritas: 'TINGGI',
+        status: 'COMPLETED',
+        assignee_nama: 'Staf',
+        assignee_email: 'staf@example.test',
+        creator_nama: 'Kabid',
+        nama_bidang: 'Operasional',
+        due_date: '2026-10-28 17:00:00',
+        anggaran_dana: '100.00',
+        anggaran_terpakai: '125.75',
+        catatan_tugas: 'Tindak lanjut selesai',
+        catatan_revisi: null,
+        kendala: null,
+        solusi: null
+      }];
+    }
+    return [];
+  };
+  const response = await request('/api/reports/export/excel', 'MUDIR');
+  assert.equal(response.status, 200);
+
+  const workbook = new ExcelJS.Workbook();
+  await workbook.xlsx.load(Buffer.from(await response.arrayBuffer()));
+  const worksheet = workbook.getWorksheet('Rekap Kinerja Tugas');
+  const headerValues = worksheet.getRow(1).values;
+  const saldoColumn = headerValues.indexOf('Sisa Saldo');
+  const notesColumn = headerValues.indexOf('Catatan Tugas');
+
+  assert.ok(saldoColumn > 0);
+  assert.ok(notesColumn > 0);
+  assert.equal(worksheet.getRow(2).getCell(saldoColumn).value, -25.75);
+  assert.equal(worksheet.getRow(2).getCell(notesColumn).value, 'Tindak lanjut selesai');
 });
 
 test('Staf dapat membuat pekerjaan yang ditugaskan kepada dirinya sendiri', async () => {

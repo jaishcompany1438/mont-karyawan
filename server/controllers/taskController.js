@@ -51,6 +51,40 @@ function parseExecutorIds(value) {
   return ids;
 }
 
+function parseMoneyCents(value) {
+  const input = String(value ?? '').trim();
+  if (!input || input.length > 64) return null;
+
+  const match = input.match(/^(\d*)(?:\.(\d*))?(?:e([+-]?\d+))?$/i);
+  if (!match || (!match[1] && !match[2])) return null;
+
+  const exponent = Number(match[3] || 0);
+  if (!Number.isSafeInteger(exponent) || Math.abs(exponent) > 16) return null;
+
+  let digits = `${match[1]}${match[2] || ''}`.replace(/^0+/, '') || '0';
+  if (digits === '0') return 0n;
+  let scale = (match[2] || '').length - exponent;
+
+  if (scale > 2) {
+    const excessScale = scale - 2;
+    const trailingDigits = digits.slice(-excessScale);
+    if (trailingDigits.length < excessScale || /[1-9]/.test(trailingDigits)) return null;
+    digits = digits.slice(0, -excessScale) || '0';
+    scale = 2;
+  }
+  if (scale < 0) {
+    digits += '0'.repeat(-scale);
+    scale = 0;
+  }
+
+  const cents = BigInt(digits) * (10n ** BigInt(2 - scale));
+  return cents <= 999999999999999n ? cents : null;
+}
+
+function formatMoneyCents(cents) {
+  return `${cents / 100n}.${String(cents % 100n).padStart(2, '0')}`;
+}
+
 async function resolveExecutorSelection(db, value) {
   const executorIds = value;
   const placeholders = executorIds.map(() => '?').join(', ');
@@ -607,6 +641,7 @@ async function submitReview(req, res) {
       return res.status(404).json({ success: false, message: 'Tugas tidak ditemukan.' });
     }
     const task = rows[0];
+    const workNote = typeof keterangan === 'string' ? keterangan.trim() : '';
 
     const isSuperAdmin = req.user.role === 'SUPER_ADMIN';
     if (!isSuperAdmin && (singleExecutorId !== undefined || selectedExecutorIds !== undefined)) {
@@ -631,21 +666,22 @@ async function submitReview(req, res) {
       executorIds = selection.executorIds;
       executorNames = selection.executorNames;
     }
-    if (anggaran_terpakai === undefined || anggaran_terpakai === null || anggaran_terpakai === '') {
+    if (anggaran_terpakai === undefined || anggaran_terpakai === null || String(anggaran_terpakai).trim() === '') {
       return res.status(400).json({ success: false, message: 'Anggaran terpakai wajib diisi, termasuk dengan nilai 0.' });
     }
-    const spent = Number(anggaran_terpakai);
-    if (!Number.isFinite(spent) || spent < 0 || spent > Number(task.anggaran_dana)) {
-      return res.status(400).json({ success: false, message: 'Anggaran terpakai harus 0 atau lebih dan tidak boleh melebihi anggaran dana.' });
+    const spentCents = parseMoneyCents(anggaran_terpakai);
+    if (spentCents === null) {
+      return res.status(400).json({ success: false, message: 'Anggaran terpakai harus berupa angka nol atau lebih dengan maksimal dua angka desimal.' });
     }
+    const spent = formatMoneyCents(spentCents);
 
     if (task.assigned_to !== userId && req.user.role === 'STAF') {
       return res.status(403).json({ success: false, message: 'Hanya penerima tugas yang dapat mengirimkan bukti kerja.' });
     }
 
     let bukti_kerja = req.file ? `/uploads/${req.file.filename}` : null;
-    if (!bukti_kerja && keterangan) {
-      bukti_kerja = `Catatan: ${keterangan}`;
+    if (!bukti_kerja && workNote) {
+      bukti_kerja = `Catatan: ${workNote}`;
     }
 
     if (!bukti_kerja && !task.bukti_kerja) {
@@ -657,9 +693,10 @@ async function submitReview(req, res) {
       await connection.beginTransaction();
       await connection.query(
         `UPDATE tasks SET status = 'UNDER_REVIEW', anggaran_terpakai = ?, bukti_kerja = COALESCE(?, bukti_kerja),
-         kendala = ?, solusi = ?, completed_by = ${isSuperAdmin ? '?' : 'COALESCE(completed_by, ?)'}, completed_at = COALESCE(completed_at, NOW())
+         catatan_pelaksana = COALESCE(?, catatan_pelaksana), kendala = ?, solusi = ?,
+         completed_by = ${isSuperAdmin ? '?' : 'COALESCE(completed_by, ?)'}, completed_at = COALESCE(completed_at, NOW())
          WHERE id = ?`,
-        [spent, bukti_kerja, String(kendala || '').trim() || null, String(solusi || '').trim() || null, executorIds[0], id]
+        [spent, bukti_kerja, workNote || null, String(kendala || '').trim() || null, String(solusi || '').trim() || null, executorIds[0], id]
       );
       if (isSuperAdmin) {
         await connection.query('DELETE FROM task_executors WHERE task_id = ?', [id]);
@@ -916,6 +953,7 @@ module.exports = {
   getTodayTasks,
   buildTaskVisibility,
   parseExecutorIds,
+  parseMoneyCents,
   getTaskById,
   createTask,
   updateTask,
