@@ -102,6 +102,7 @@ async function initDB() {
         completed_by INT NULL,
         completed_at DATETIME NULL,
         bukti_kerja VARCHAR(255) NULL,
+        catatan_pelaksana TEXT NULL,
         catatan_revisi TEXT NULL,
         catatan_reviewer TEXT NULL,
         nilai_sop DECIMAL(3,1) NULL,
@@ -186,6 +187,7 @@ async function initDB() {
       ['users', 'no_telepon', 'ALTER TABLE users ADD COLUMN no_telepon VARCHAR(30) NULL AFTER sub_bidang'],
       ['tasks', 'anggaran_dana', 'ALTER TABLE tasks ADD COLUMN anggaran_dana DECIMAL(15,2) NOT NULL DEFAULT 0 AFTER due_date'],
       ['tasks', 'anggaran_terpakai', 'ALTER TABLE tasks ADD COLUMN anggaran_terpakai DECIMAL(15,2) NOT NULL DEFAULT 0 AFTER anggaran_dana'],
+      ['tasks', 'catatan_pelaksana', 'ALTER TABLE tasks ADD COLUMN catatan_pelaksana TEXT NULL AFTER bukti_kerja'],
       ['tasks', 'catatan_reviewer', 'ALTER TABLE tasks ADD COLUMN catatan_reviewer TEXT NULL AFTER catatan_revisi'],
       ['tasks', 'nilai_sop', 'ALTER TABLE tasks ADD COLUMN nilai_sop DECIMAL(3,1) NULL AFTER catatan_reviewer'],
       ['tasks', 'nilai_waktu', 'ALTER TABLE tasks ADD COLUMN nilai_waktu DECIMAL(3,1) NULL AFTER nilai_sop'],
@@ -206,6 +208,13 @@ async function initDB() {
       );
       if (!columns[0].present) await db.query(statement);
     }
+    await db.query(`
+      UPDATE tasks
+      SET catatan_pelaksana = TRIM(SUBSTRING(bukti_kerja, 9))
+      WHERE (catatan_pelaksana IS NULL OR TRIM(catatan_pelaksana) = '')
+        AND bukti_kerja LIKE 'Catatan:%'
+        AND TRIM(SUBSTRING(bukti_kerja, 9)) != ''
+    `);
     await db.query(`
       INSERT IGNORE INTO task_executors (task_id, user_id)
       SELECT id, completed_by

@@ -172,7 +172,7 @@ async function getReportRows(req) {
              starter.nama AS started_by_nama,
              completer.nama AS completed_by_nama,
              b.nama_bidang, b.kode_bidang,
-             t.deskripsi AS catatan_tugas,
+             t.catatan_pelaksana AS catatan_tugas,
              t.catatan_reviewer,
              t.nilai_sop, t.nilai_waktu, t.nilai_kualitas
       FROM tasks t
@@ -297,6 +297,7 @@ async function exportExcelReport(req, res) {
       { header: 'Anggaran Terpakai', key: 'anggaran_terpakai', width: 20 },
       { header: 'Sisa Saldo', key: 'sisa_saldo', width: 18 },
       { header: 'Tenggat Waktu (Due Date)', key: 'due_date', width: 22 },
+      { header: 'Catatan Tugas', key: 'catatan_tugas', width: 38 },
       { header: 'Catatan Revisi', key: 'catatan_revisi', width: 30 },
       { header: 'Kendala dan Solusi', key: 'kendala_solusi', width: 38 }
     ];
@@ -328,6 +329,7 @@ async function exportExcelReport(req, res) {
         anggaran_terpakai: Number(row.anggaran_terpakai || 0),
         sisa_saldo: Number(row.anggaran_dana || 0) - Number(row.anggaran_terpakai || 0),
         due_date: new Date(row.due_date).toLocaleString('id-ID'),
+        catatan_tugas: row.catatan_tugas || '-',
         catatan_revisi: row.catatan_revisi || '-',
         kendala_solusi: formatKendalaSolusi(row.kendala, row.solusi)
       });
@@ -438,7 +440,7 @@ function aggregateReportRows(rows, filters = {}) {
     if (['COMPLETED', 'DONE'].includes(row.status)) group.completed += 1;
     group.totalBudget += Number(row.anggaran_dana || 0);
     group.totalSpent += Number(row.anggaran_terpakai || 0);
-    const taskNote = String(row.catatan_tugas || row.deskripsi || '').trim();
+    const taskNote = String(row.catatan_tugas || '').trim();
     const reviewerNote = String(row.catatan_reviewer || row.catatan_revisi || '').trim();
     if (taskNote) group.taskNotes.push(taskNote);
     if (reviewerNote) group.reviewerNotes.push(reviewerNote);
